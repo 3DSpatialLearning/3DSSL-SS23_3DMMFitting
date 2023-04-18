@@ -162,5 +162,5 @@ cython_debug/
 # ignore flame
 *.pkl
 
-# ignore toy example data
+# ignore toy example npy
 *.npy
