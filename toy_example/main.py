@@ -18,13 +18,13 @@ def load_data():
     points = np.load(POINTS_FILE)
     normals = np.load(NORMALS_FILE)
     data = {
-        'landmakrs': landmarks,
-        "poitns": points,
+        'landmarks': landmarks,
+        "points": points,
         "normals": normals
     }
     return data
 
-def visualize_points(data: dict(str, np.ndarray)):
+def visualize_points(data: dict[str, np.ndarray]):
     pv_landmarks = pv.PolyData(data["landmarks"])
     pv_points = pv.PolyData(data["points"])
     plotter = pv.Plotter()
@@ -77,5 +77,5 @@ def visualize_fitted_flame():
     visualize_points(out_data)
 
 if __name__ == '__main__':
-    # visualize_points_to_fit()
-    visualize_fitted_flame()
+    visualize_points_to_fit()
+    # visualize_fitted_flame()
