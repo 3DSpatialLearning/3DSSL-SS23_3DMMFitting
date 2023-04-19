@@ -3,3 +3,5 @@ torch
 torchvision
 smplx
 pyvista
+scipy
+chumpy
