@@ -26,7 +26,7 @@ import torch.nn as nn
 import pickle
 from smplx.lbs import lbs, batch_rodrigues, vertices2landmarks, find_dynamic_lmk_idx_and_bcoords
 from smplx.utils import Struct, to_tensor, to_np, rot_mat_to_euler
-
+import os
 
 class FLAME(nn.Module):
     """
@@ -35,8 +35,10 @@ class FLAME(nn.Module):
     """
     def __init__(self, config):
         super(FLAME, self).__init__()
+        current_dir = os.path.dirname(__file__)
+        current_dir = current_dir.replace('\\', '/')
         print("creating the FLAME Decoder")
-        with open(config.flame_model_path, 'rb') as f:
+        with open(current_dir + config.flame_model_path, 'rb') as f:
             self.flame_model = Struct(**pickle.load(f, encoding='latin1'))
         self.NECK_IDX = 1
         self.batch_size = config.batch_size
@@ -116,7 +118,7 @@ class FLAME(nn.Module):
 
         # Static and Dynamic Landmark embeddings for FLAME
 
-        with open(config.static_landmark_embedding_path, 'rb') as f:
+        with open(current_dir + config.static_landmark_embedding_path, 'rb') as f:
             static_embeddings = Struct(**pickle.load(f, encoding='latin1'))
 
         lmk_faces_idx = (static_embeddings.lmk_face_idx).astype(np.int64)
