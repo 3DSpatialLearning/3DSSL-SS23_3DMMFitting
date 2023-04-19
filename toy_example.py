@@ -74,7 +74,7 @@ if __name__ == "__main__":
     flame_landmarks = flame_landmarks.squeeze()
 
     landmarks_input = landmarks[15:24].transpose()
-    landmarks_source = flame_landmarks[10:19].numpy().transpose()
+    landmarks_source = flame_landmarks[27:36].numpy().transpose()
 
     # Find the rigid transformation
     R, t = rigid_transform_3D(landmarks_input, landmarks_source)
@@ -116,7 +116,11 @@ if __name__ == "__main__":
 
     vertices = vertices.detach().cpu().squeeze().numpy()
 
-    pv_points = pv.PolyData(vertices)
+    pv_vertices = pv.PolyData(vertices)
+    pv_points = pv.PolyData(points)
+
     plotter = pv.Plotter()
     plotter.add_mesh(pv_points, color='green', point_size=1)
+    plotter.add_mesh(pv_vertices, color='red', point_size=1)
+
     plotter.show()
