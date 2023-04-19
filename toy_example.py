@@ -70,17 +70,30 @@ if __name__ == "__main__":
     exp = torch.zeros(1, 50).float()
     pose = torch.zeros(1, 6).float()
 
-    _, flame_landmarks = flame_model(shape, exp, pose)
-    flame_landmarks = flame_landmarks.squeeze()
+    vertices, flame_landmarks = flame_model(shape, exp, pose)
+    flame_landmarks = flame_landmarks.squeeze().cpu().numpy()
+    vertices = vertices.squeeze().cpu().numpy()
+    pv_landmarks = pv.PolyData(flame_landmarks)
+    pv_vertices = pv.PolyData(vertices)
+    plotter = pv.Plotter()
+    plotter.add_mesh(pv_landmarks, color='red', point_size=5)
+    plotter.add_mesh(pv_vertices, color='green', point_size=3)
+    plotter.show()
 
     landmarks_input = landmarks[15:24].transpose()
-    landmarks_source = flame_landmarks[27:36].numpy().transpose()
+    landmarks_source = flame_landmarks[27:36].transpose()
 
     # Find the rigid transformation
     R, t = rigid_transform_3D(landmarks_input, landmarks_source)
 
     landmarks = (R @ landmarks.transpose() + t).transpose()
     points = (R @ points.transpose() + t).transpose()
+
+    pv_points_input = pv.PolyData(points)
+    plotter = pv.Plotter()
+    plotter.add_mesh(pv_points_input, color='green', point_size=1)
+    plotter.add_mesh(pv_vertices, color='red', point_size=1)
+    plotter.show()
 
     # Optimize for parameters
     steps = 1000
