@@ -1,5 +1,6 @@
-numpy
+numpy==1.18.1
 torch
 torchvision
+chumpy
 smplx
 pyvista

@@ -129,7 +129,7 @@ class FLAME(nn.Module):
                              torch.tensor(lmk_bary_coords, dtype=self.dtype))
 
         if self.use_face_contour:
-            conture_embeddings = np.load(config.dynamic_landmark_embedding_path,
+            conture_embeddings = np.load(current_dir + config.dynamic_landmark_embedding_path,
                 allow_pickle=True, encoding='latin1')
             conture_embeddings = conture_embeddings[()]
             dynamic_lmk_faces_idx = np.array(conture_embeddings['lmk_face_idx']).astype(np.int64)
@@ -175,7 +175,7 @@ class FLAME(nn.Module):
         aa_pose = torch.index_select(pose.view(batch_size, -1, 3), 1,
                                      neck_kin_chain)
         rot_mats = batch_rodrigues(
-            aa_pose.view(-1, 3), dtype=dtype).view(batch_size, -1, 3, 3)
+            aa_pose.view(-1, 3)).view(batch_size, -1, 3, 3)
 
         rel_rot_mat = torch.eye(3, device=vertices.device,
                                 dtype=dtype).unsqueeze_(dim=0).expand(batch_size, -1, -1)
@@ -218,7 +218,7 @@ class FLAME(nn.Module):
         vertices, _ = lbs(betas, full_pose, template_vertices,
                                self.shapedirs, self.posedirs,
                                self.J_regressor, self.parents,
-                               self.lbs_weights, dtype=self.dtype)
+                               self.lbs_weights)
 
         lmk_faces_idx = self.lmk_faces_idx.unsqueeze(dim=0).repeat(
             self.batch_size, 1)

@@ -51,7 +51,7 @@ parser.add_argument(
 
 parser.add_argument(
     '--use_face_contour',
-    default = True,
+    default = False,
     type = bool,
     help = 'If true apply the landmark loss on also on the face contour.'
 )
