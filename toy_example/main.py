@@ -3,9 +3,6 @@ import pyvista as pv
 import torch
 from Loss import DistanceLoss
 import torch.nn as nn
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), os.pardir)))
 from flame.FLAME import FLAME
 from flame.config import get_config
 
@@ -77,5 +74,5 @@ def visualize_fitted_flame():
     visualize_points(out_data)
 
 if __name__ == '__main__':
-    visualize_points_to_fit()
-    # visualize_fitted_flame()
+    # visualize_points_to_fit()
+    visualize_fitted_flame()
