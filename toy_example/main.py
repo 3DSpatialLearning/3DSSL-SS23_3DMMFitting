@@ -1,10 +1,10 @@
 import numpy as np
 import pyvista as pv
 import torch
-from Loss import ChamferDistance
 import torch.nn as nn
 from flame.FLAME import FLAME
 from flame.config import get_config
+from pytorch3d.loss import chamfer_distance
 
 LANDMARKS_FILE = "./data/team1_landmarks.npy"
 POINTS_FILE = "./data/team1_points.npy"
@@ -38,7 +38,7 @@ def visualize_points_to_fit():
 def fitting(data:dict, steps: int = 100, lr: float = 1e-3, wd: float = 1e-4):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     for k, v in data.items():
-        data[k] = torch.from_numpy(v).unsqueeze(0).to(device)
+        data[k] = torch.from_numpy(v).float().unsqueeze(0).to(device)
 
     config = get_config()
     flame_model = FLAME(config)
@@ -56,14 +56,13 @@ def fitting(data:dict, steps: int = 100, lr: float = 1e-3, wd: float = 1e-4):
         lr=lr,
         weight_decay=wd
     )
-    criterion = ChamferDistance()
     # optimize for pose
     pose.requires_grad = True
     exp.requires_grad = False
     shape.requires_grad = False
     for step in range(steps):
         _, landmarks3d = flame_model(shape_params=shape, expression_params=exp, pose_params=pose)
-        loss = criterion(data["landmarks"], landmarks3d)
+        loss, _ = chamfer_distance(data["landmarks"], landmarks3d)
         pose_optimizer.zero_grad()
         loss.backward()
         pose_optimizer.step()
@@ -73,7 +72,7 @@ def fitting(data:dict, steps: int = 100, lr: float = 1e-3, wd: float = 1e-4):
     shape.requires_grad = True
     for step in range(steps):
         vertices, _ = flame_model(shape_params=shape, expression_params=exp, pose_params=pose)
-        loss = criterion(data["points"], vertices)
+        loss, _ = chamfer_distance(data["points"], vertices)
         shape_optimizer.zero_grad()
         loss.backward()
         shape_optimizer.step()
