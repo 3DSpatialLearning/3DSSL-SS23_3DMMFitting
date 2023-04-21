@@ -1,3 +1,4 @@
+# from https://github.com/soubhiksanyal/FLAME_PyTorch/blob/master/FLAME.py
 """
 FLAME Layer: Implementation of the 3D Statistical Face model in PyTorch
 It is designed in a way to directly plug in as a decoder layer in a 
@@ -172,7 +173,7 @@ class FLAME(nn.Module):
         aa_pose = torch.index_select(pose.view(batch_size, -1, 3), 1,
                                      neck_kin_chain)
         rot_mats = batch_rodrigues(
-            aa_pose.view(-1, 3), dtype=dtype).view(batch_size, -1, 3, 3)
+            aa_pose.view(-1, 3)).view(batch_size, -1, 3, 3)
 
         rel_rot_mat = torch.eye(3, device=vertices.device,
                                 dtype=dtype).unsqueeze_(dim=0).expand(batch_size, -1, -1)
@@ -215,7 +216,7 @@ class FLAME(nn.Module):
         vertices, _ = lbs(betas, full_pose, template_vertices,
                                self.shapedirs, self.posedirs,
                                self.J_regressor, self.parents,
-                               self.lbs_weights, dtype=self.dtype)
+                               self.lbs_weights)
 
         lmk_faces_idx = self.lmk_faces_idx.unsqueeze(dim=0).repeat(
             self.batch_size, 1)

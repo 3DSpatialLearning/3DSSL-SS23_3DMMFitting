@@ -1,5 +1,8 @@
-numpy
-torch
-torchvision
+numpy==1.23.1
+torch==1.13.0
+# torchvision
 smplx
 pyvista
+scipy
+chumpy
+pytorch3d
