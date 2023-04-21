@@ -1,5 +1,12 @@
-# data
-data
+!.gitkeep
+
+# flame
+*.pkl
+*.npz
+*.npy
+
+# environment
+**_ENV
 
 ## Python
 
