@@ -5,7 +5,7 @@ from pytorch3d.loss.chamfer import _validate_chamfer_reduction_inputs
 
 # Custom chamfer distance:
 #   - One way loss (x -> y)
-#   - Filter out larger distance pairs 
+#   - Filter out large distance pairs
 def custom_chamfer_distance_single_direction(
         x,
         y,
