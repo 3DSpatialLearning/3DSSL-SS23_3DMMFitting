@@ -7,7 +7,7 @@ from utils.data import dict_tensor_to_np
 from utils.transform import rigid_transform_3d
 from torch.optim.lr_scheduler import ExponentialLR
 from tqdm import tqdm
-from utils.loss import custom_chamfer_distance
+from utils.loss import custom_chamfer_distance_single_direction
 from utils.visualization import visualize_3d_scan_and_3d_face_model
 
 
@@ -57,14 +57,14 @@ def fit_flame_model_to_input_point_cloud(
         lr=lr,
     )
     scheduler = ExponentialLR(optimizer, gamma=0.999)
-    loss_fn = custom_chamfer_distance
+    loss_fn = custom_chamfer_distance_single_direction
 
     pbar = tqdm(range(steps))
 
     for _ in pbar:
         optimizer.zero_grad()
         predicted_vertices, predicted_landmarks = flame_model(shape_params=shape, expression_params=exp, pose_params=pose)
-        loss, _ = loss_fn(input_points, predicted_vertices)
+        loss, _ = loss_fn(predicted_vertices, input_points)
         loss.backward()
         optimizer.step()
         scheduler.step()
