@@ -23,12 +23,29 @@ def visualize_3d_face_model(points: np.ndarray, faces: np.ndarray):
 def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
                                         points_3d_face: np.ndarray,
                                         faces_3d_face: np.ndarray):
+
     pv_scan_points = pv.PolyData(points_scan)
     pv_3d_mesh = pv.PolyData(points_3d_face,
                              np.concatenate((np.ones((faces_3d_face.shape[0], 1)) * 3,
                                              faces_3d_face), axis=-1).reshape(-1).astype(np.int64))
-    plotter = pv.Plotter()
-    plotter.add_mesh(pv_scan_points, color='red', opacity=0.1, point_size=1)
-    plotter.add_mesh(pv_3d_mesh, color='green')
+    plotter = pv.Plotter(shape=(1, 3))
+
+    plotter.subplot(0, 0)
+    plotter.add_mesh(pv_scan_points, color='red', point_size=1)
+    plotter.add_text("Face Scan")
     plotter.add_axes(line_width=5, labels_off=False)
+
+    plotter.subplot(0, 1)
+    plotter.add_mesh(pv_3d_mesh, color='green')
+    plotter.add_text("Flame model")
+    plotter.add_axes(line_width=5, labels_off=False)
+
+    plotter.subplot(0, 2)
+    plotter.add_mesh(pv_scan_points, color='red', opacity=0.5, point_size=1)
+    plotter.add_mesh(pv_3d_mesh, color='green')
+    plotter.add_text("Combined View")
+    plotter.add_axes(line_width=5, labels_off=False)
+
+    plotter.link_views()
+    plotter.camera_position = 'xy'
     plotter.show()
