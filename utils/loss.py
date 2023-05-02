@@ -4,8 +4,20 @@ from pytorch3d.loss.chamfer import _validate_chamfer_reduction_inputs
 
 
 # Custom chamfer distance:
-#   - One way loss (x -> y)
-#   - Filter out large distance pairs
+def scan_to_mesh_distance(scans_points,
+                          scans_normals,
+                          meshes_points,
+                          meshes_normals):
+
+    return custom_chamfer_distance_single_direction(
+        scans_points,
+        meshes_points,
+        x_normals=scans_normals,
+        y_normals=meshes_normals,
+        threshold=0.00005
+    )
+
+
 def custom_chamfer_distance_single_direction(
         x,
         y,
@@ -16,11 +28,11 @@ def custom_chamfer_distance_single_direction(
         weights=None,
         batch_reduction: Union[str, None] = "mean",
         point_reduction: str = "mean",
-        threshold: float = 0.0005,
+        threshold: float = 0.00001,
         norm: int = 2,
 ):
     """
-    Chamfer distance between two pointclouds x and y.
+    Single direction Chamfer distance from point cloud x to y.
 
     Args:
         x: FloatTensor of shape (N, P1, D) or a Pointclouds object representing
