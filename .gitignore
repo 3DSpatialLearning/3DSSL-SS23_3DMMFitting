@@ -169,4 +169,5 @@ cython_debug/
 
 # ignore logs
 /runs
+toy_example/runs
 !.gitkeep
