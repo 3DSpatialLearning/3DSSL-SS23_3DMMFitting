@@ -1,9 +1,9 @@
 from utils.data import load_data
 from utils.fitting import fit_flame_model_to_input_point_cloud
 
-LANDMARKS_FILE = "./data/toy_task/single_frame_point_cloud_fitting/team1_landmarks.npy"
-POINTS_FILE = "./data/toy_task/single_frame_point_cloud_fitting/team1_points.npy"
-NORMALS_FILE = "./data/toy_task/single_frame_point_cloud_fitting/team1_normals.npy"
+LANDMARKS_FILE = "../data/toy_task/single_frame_point_cloud_fitting/team1_landmarks.npy"
+POINTS_FILE = "../data/toy_task/single_frame_point_cloud_fitting/team1_points.npy"
+NORMALS_FILE = "../data/toy_task/single_frame_point_cloud_fitting/team1_normals.npy"
 
 if __name__ == '__main__':
     scale = 1./1000.
