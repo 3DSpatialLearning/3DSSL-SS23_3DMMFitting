@@ -163,7 +163,8 @@ cython_debug/
 *.pkl
 *.npz
 
-# ignore toy example npy
+# ignore npy and rgb
 *.npy
+*.png
 
 !.gitkeep

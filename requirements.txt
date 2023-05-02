@@ -4,3 +4,4 @@ torchvision
 chumpy
 smplx
 pyvista
+opencv-python

@@ -24,7 +24,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import pickle
-from smplx.lbs import lbs, batch_rodrigues, vertices2landmarks, find_dynamic_lmk_idx_and_bcoords
+from smplx.lbs import lbs, batch_rodrigues, vertices2landmarks
 from smplx.utils import Struct, to_tensor, to_np, rot_mat_to_euler
 
 

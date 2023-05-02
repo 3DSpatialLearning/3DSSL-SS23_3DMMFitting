@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from flame.FLAME import FLAME
 from flame.config import get_config
-from utils.data import dict_tensor_to_np
 from utils.transform import rigid_transform_3d
 from torch.optim.lr_scheduler import ExponentialLR
 from tqdm import tqdm

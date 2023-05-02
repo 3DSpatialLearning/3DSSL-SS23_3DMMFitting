@@ -1,7 +1,6 @@
 import numpy as np
 import pyvista as pv
 
-
 def visualize_3d_scan_and_landmarks(points: np.ndarray, landmarks: np.ndarray):
     pv_points = pv.PolyData(points)
     pv_landmarks = pv.PolyData(landmarks)
