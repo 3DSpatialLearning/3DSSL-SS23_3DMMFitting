@@ -4,14 +4,18 @@ import dlib
 """
     Wrapper class for dlib's landmark detector.
     This class is used to detect 68 landmarks on a face image.
-    To donwnload the detector model, visit: http://dlib.net/files/mmod_human_face_detector.dat.bz2
+    To download the detector model, visit: http://dlib.net/files/mmod_human_face_detector.dat.bz2 or use default one by passing None
     To download the predictor model, visit: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 """
 class DlibLandmarkDetector:
     detector = None
     predictor = None
-    def __init__(self, path_to_dlib_detector_model, path_to_dlib_predictor_model: str):
-        self.detector = dlib.cnn_face_detection_model_v1(path_to_dlib_detector_model)
+    def __init__(self, path_to_dlib_detector_model: str = None, path_to_dlib_predictor_model: str = None):
+        if path_to_dlib_detector_model is None:
+            self.detector = dlib.get_frontal_face_detector()
+        else:
+            self.detector = dlib.cnn_face_detection_model_v1(path_to_dlib_detector_model)
+        assert path_to_dlib_predictor_model is not None, "Path to dlib predictor model is None"
         self.predictor = dlib.shape_predictor(path_to_dlib_predictor_model)
 
     def detect_landmarks(self, image: np.ndarray) -> np.ndarray:

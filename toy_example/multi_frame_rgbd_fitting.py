@@ -18,8 +18,8 @@ INTRINSICS_FILE = CAMERA_DIR + "/intrinsics.npy"
 
 SCALE = 1./1000.
 
-DLIB_DETECTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
-DLIB_PREDICTOR_PATH = "../data/checkpoints/dlib_face_recognition_resnet_model_v1.dat"
+DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
+DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
 
 if __name__ == '__main__':
     print("Loading frames data...")
@@ -34,19 +34,17 @@ if __name__ == '__main__':
     print("Loading landmark detector...")
     detector = DlibLandmarkDetector(DLIB_DETECTOR_PATH, DLIB_PREDICTOR_PATH)
 
-    # for id, frame in data['frames'].items():
-    #     pass
-
-    id = '00000'
-    frame = data['frames'][id]
-    image = frame['image']
-    landmarks = detector.detect_landmarks(image)
-    cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty(f"image {id}", int(image.shape[0]*0.25), int(image.shape[1]*0.25))
-    for point in landmarks:
-        cv2.circle(image, tuple(point), radius=10, color=(0, 0, 255), thickness=-1)
-    cv2.imshow(f"image {id}", image)
-    cv2.waitKey(0)
-    cv2.destroyWindow(f"image {id}")
+    print("Visualizing frames...")
+    for id, frame in data['frames'].items():
+        frame = data['frames'][id]
+        image = frame['image']
+        landmarks = detector.detect_landmarks(image)
+        cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(f"image {id}", int(image.shape[0]*0.25), int(image.shape[1]*0.25))
+        for point in landmarks:
+            cv2.circle(image, tuple(point), radius=10, color=(0, 0, 255), thickness=-1)
+        cv2.imshow(f"image {id}", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow(f"image {id}")
 
 
