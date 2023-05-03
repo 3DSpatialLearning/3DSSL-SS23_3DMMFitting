@@ -1,5 +1,9 @@
 from utils.data import load_data
 from utils.fitting import fit_flame_model_to_input_point_cloud
+import os
+
+main_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(str(main_dir))
 
 LANDMARKS_FILE = "../data/toy_task/single_frame_point_cloud_fitting/team1_landmarks.npy"
 POINTS_FILE = "../data/toy_task/single_frame_point_cloud_fitting/team1_points.npy"

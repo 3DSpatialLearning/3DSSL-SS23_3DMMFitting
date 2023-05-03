@@ -1,4 +1,8 @@
 from utils.data import load_batch_data, load_camera_data
+import os
+
+main_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(str(main_dir))
 
 LANDMARKS_DIR = "../data/toy_task/multi_frame_rgbd_fitting/landmarks"
 CAMERA_DIR = "../data/toy_task/multi_frame_rgbd_fitting/222200037"
