@@ -167,7 +167,11 @@ cython_debug/
 *.npy
 *.png
 
+# ignore models and checkpoints
+*.dat
+
 # ignore logs
 /runs
 toy_example/runs
+
 !.gitkeep

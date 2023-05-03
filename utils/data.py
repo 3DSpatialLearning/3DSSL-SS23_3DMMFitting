@@ -90,6 +90,12 @@ def load_batch_data(scale: float = 1.0, landmarks_dir: str = None, points_dir: s
                             image_path=image_id_to_path[id] if image_id_to_path is not None else None)
     return data
 
+def resize_data_images(data: dict[str, dict], sx: float = 1.0, sy: float = 1.0) -> dict[str, dict]:
+    frames = data['frames']
+    for id, frame in frames.items():
+        frames[id]['image'] = cv2.resize(frame['image'], (0, 0), fx=sx, fy=sy)
+    data['frames'] = frames
+    return data
 
 def dict_tensor_to_np(data: dict[str, torch.tensor]):
     for k, v in data.items():
