@@ -1,0 +1,10 @@
+numpy==1.23.1
+torch==1.13.0
+torchvision
+chumpy
+smplx
+pyvista
+tensorboard
+opencv-python
+pytorch3d
+dlib
