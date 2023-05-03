@@ -1,4 +1,5 @@
-from utils.data import load_batch_data, load_camera_data, resize_data_images
+from utils.data import load_batch_data, load_camera_data
+from utils.transform import backproject_points
 from models.LandmarkDetector import DlibLandmarkDetector
 import os
 import cv2
@@ -21,6 +22,8 @@ SCALE = 1./1000.
 DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
 DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
 
+VISUALIZE = False
+
 if __name__ == '__main__':
     print("Loading frames data...")
     frames_data = load_batch_data(scale=SCALE,
@@ -32,19 +35,27 @@ if __name__ == '__main__':
     data = load_camera_data(extrinsics_path=EXTRINSICS_FILE, intrinsics_path=INTRINSICS_FILE)
     data['frames'] = frames_data
     print("Loading landmark detector...")
-    detector = DlibLandmarkDetector(DLIB_DETECTOR_PATH, DLIB_PREDICTOR_PATH)
+    detector = DlibLandmarkDetector(None, DLIB_PREDICTOR_PATH)
 
-    print("Visualizing frames...")
+    print("Calculating landmarks...")
     for id, frame in data['frames'].items():
         frame = data['frames'][id]
         image = frame['image']
-        landmarks = detector.detect_landmarks(image)
-        cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty(f"image {id}", int(image.shape[0]*0.25), int(image.shape[1]*0.25))
-        for point in landmarks:
-            cv2.circle(image, tuple(point), radius=10, color=(0, 0, 255), thickness=-1)
-        cv2.imshow(f"image {id}", image)
-        cv2.waitKey(0)
-        cv2.destroyWindow(f"image {id}")
-
+        landmarks_2d = detector.detect_landmarks(image)
+        if VISUALIZE:
+            cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty(f"image {id}", int(image.shape[0]*0.75), int(image.shape[1]*0.75))
+            for i, uv in enumerate(landmarks_2d):
+                cv2.putText(image, str(i), tuple(uv), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale=1, color=(0, 0, 255), thickness=2)
+            cv2.imshow(f"image {id}", image)
+            cv2.waitKey(0)
+            cv2.destroyWindow(f"image {id}")
+        print(data['extrinsics'], data['intrinsics'])
+        gt_landmarks = frame['landmarks']
+        estimated_landmarks = backproject_points(landmarks_2d, frame['points'], data['intrinsics'], data['extrinsics'])
+        print(estimated_landmarks[:15])
+        print('--------------------------------------------------')
+        print(gt_landmarks[:15])
+        exit(0)
 
