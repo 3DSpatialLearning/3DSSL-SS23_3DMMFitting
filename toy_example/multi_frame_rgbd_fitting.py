@@ -3,6 +3,7 @@ from utils.transform import backproject_points
 from models.LandmarkDetector import DlibLandmarkDetector
 import os
 import cv2
+import pyvista as pv
 
 main_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(str(main_dir))
@@ -23,6 +24,7 @@ DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
 DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
 
 VISUALIZE = False
+VISUALIZE_LANDMARKS_3D = True
 
 if __name__ == '__main__':
     print("Loading frames data...")
@@ -55,6 +57,16 @@ if __name__ == '__main__':
         print(data['extrinsics'], data['intrinsics'])
         gt_landmarks = frame['landmarks']
         estimated_landmarks = backproject_points(landmarks_2d, frame['points'], data['intrinsics'], data['extrinsics'])
+        
+        if VISUALIZE_LANDMARKS_3D:
+            plotter = pv.Plotter()
+            plotter.add_mesh(pv.PolyData(gt_landmarks), color='red', point_size=7)
+            plotter.add_mesh(pv.PolyData(estimated_landmarks), color='green', point_size=7)
+            plotter.add_text("Landmarks (Red: Ground Truth, Green: Estimated)")
+            plotter.add_axes(line_width=5, labels_off=False)
+            plotter.camera_position = 'xy'
+            plotter.show()
+
         print(estimated_landmarks[:15])
         print('--------------------------------------------------')
         print(gt_landmarks[:15])
