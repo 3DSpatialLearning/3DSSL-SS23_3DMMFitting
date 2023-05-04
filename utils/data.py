@@ -36,61 +36,15 @@ def load_camera_data(intrinsics_path: str = None, extrinsics_path: str = None):
         },
         id_2: {...}
 """
-def load_batch_data(scale: float = 1.0, landmarks_dir: str = None, points_dir: str = None, normals_dir: str = None, image_dir: str = None) \
-        -> dict[str, dict]:
-    data = {}
-    if landmarks_dir is not None:
-        landmark_id_to_path = {}
-        files = os.listdir(landmarks_dir)
-        for file in files:
-            if ".npy" in file:
-                file_path = os.path.join(landmarks_dir, file)
-                id = os.path.splitext(file)[0]
-                landmark_id_to_path[id] = file_path
-    if points_dir is not None:
-        point_id_to_path = {}
-        files = os.listdir(points_dir)
-        for file in files:
-            if ".npy" in file:
-                file_path = os.path.join(points_dir, file)
-                id = os.path.splitext(file)[0]
-                point_id_to_path[id] = file_path
-    if normals_dir is not None:
-        normal_id_to_path = {}
-        files = os.listdir(normals_dir)
-        for file in files:
-            if ".npy" in file:
-                file_path = os.path.join(normals_dir, file)
-                id = os.path.splitext(file)[0]
-                normal_id_to_path[id] = file_path
-    if image_dir is not None:
-        image_id_to_path = {}
-        files = os.listdir(image_dir)
-        for file in files:
-            if ".png" in file:
-                file_path = os.path.join(image_dir, file)
-                id = os.path.splitext(file)[0]
-                image_id_to_path[id] = file_path
 
-    list_keys = []
-    if landmark_id_to_path is not None:
-        list_keys.append(landmark_id_to_path.keys())
-    if point_id_to_path is not None:
-        list_keys.append(point_id_to_path.keys())
-    if normal_id_to_path is not None:
-        list_keys.append(normal_id_to_path.keys())
-    if image_id_to_path is not None:
-        list_keys.append(image_id_to_path.keys())
-    valid_ids = list(set.intersection(*map(set, list_keys)))
-    for id in valid_ids:
-        data[id] = load_data(scale=scale,
-                            landmarks_path=landmark_id_to_path[id] if landmark_id_to_path is not None else None,
-                            points_path=point_id_to_path[id] if point_id_to_path is not None else None,
-                            normals_path=normal_id_to_path[id] if normal_id_to_path is not None else None,
-                            image_path=image_id_to_path[id] if image_id_to_path is not None else None)
+def resize_data_images(data: dict[str, dict], sx: float = 1.0, sy: float = 1.0) -> dict[str, dict]:
+    frames = data['frames']
+    for id, frame in frames.items():
+        frames[id]['image'] = cv2.resize(frame['image'], (0, 0), fx=sx, fy=sy)
+    data['frames'] = frames
     return data
 
-
-def dict_tensor_to_np(data: dict[str, torch.tensor]):
+def dict_tensor_to_np(data: dict[str, torch.tensor]) -> dict[str, np.array]:
     for k, v in data.items():
-        data[k] = v.detach().cpu().numpy()
+        data[k] = v.detach().cpu().squeeze().numpy()
+    return data

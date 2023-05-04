@@ -1,5 +1,30 @@
 import numpy as np
 
+def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray, E: np.ndarray) -> np.ndarray:
+    """
+    Backprojects a set of 2D pixels into 2D points using the given camera intrinsics and extrinsics.
+    :param points: 2D points Nx2
+    :param intrinsics: Camera intrinsics 3x3
+    :param extrinsics: Camera extrinsics 4x4
+    :return: 3D points
+    """
+    assert points.shape[1] == 2
+    assert K.shape == (3, 3)
+    assert E.shape == (4, 4)
+
+    depths = depth_map[points[:, 1], points[:, 0]].reshape(-1, 1)
+
+    # screen space to cam space
+    points_homo = np.hstack((points, np.ones((len(points), 1)))).T
+    cam_coords = depths * (np.linalg.inv(K)@points_homo).T
+
+    # camera space to world space
+    cam_coords_homo = np.hstack((cam_coords, np.ones((len(points), 1))))
+    world_coords_homo = E@cam_coords_homo.T
+    world_coords = world_coords_homo[:3, :].T
+    
+    return world_coords
+
 
 def rigid_transform_3d(source_points: np.ndarray, dest_points: np.ndarray):
     # Taken from https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py
