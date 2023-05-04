@@ -34,6 +34,7 @@ if __name__ == '__main__':
     print("Loading camera data...")
     data = load_camera_data(extrinsics_path=EXTRINSICS_FILE, intrinsics_path=INTRINSICS_FILE)
     data['frames'] = frames_data
+    data["extrinsics"][:, 3] *= 0.001
     print("Loading landmark detector...")
     detector = DlibLandmarkDetector(None, DLIB_PREDICTOR_PATH)
 

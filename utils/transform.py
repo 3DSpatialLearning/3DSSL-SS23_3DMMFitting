@@ -12,17 +12,18 @@ def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray,
     assert K.shape == (3, 3)
     assert E.shape == (4, 4)
 
-    zs = depth_map[points[:, 1], points[:, 0]].T
-    # Compute 3D homogeneous points in camera coordinates
-    points_homo = np.hstack((points, np.ones((len(points), 1)))).T # (3xN)
-    K_inv = np.linalg.inv(K)
-    xy_ = K_inv@points_homo
-    points3d = xy_ * np.repeat(zs[None,:], 3, axis=0)
-    # camera coordinate to world
-    points3d_homo = np.vstack((points3d, np.ones((1, points3d.shape[1])))) # (4xN)
-    points3d_homo = E@points3d_homo
-    points3d_world = points3d_homo[:3, :].T # (Nx3)
-    return points3d_world
+    depths = depth_map[points[:, 1], points[:, 0]].reshape(-1, 1)
+
+    # screen space to cam space
+    points_homo = np.hstack((points, np.ones((len(points), 1)))).T
+    cam_coords = depths * (np.linalg.inv(K)@points_homo).T
+
+    # camera space to world space
+    cam_coords_homo = np.hstack((cam_coords, np.ones((len(points), 1))))
+    world_coords_homo = E@cam_coords_homo.T
+    world_coords = world_coords_homo[:3, :].T
+    
+    return world_coords
 
 
 def rigid_transform_3d(source_points: np.ndarray, dest_points: np.ndarray):
