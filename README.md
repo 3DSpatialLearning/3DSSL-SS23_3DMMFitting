@@ -11,5 +11,5 @@ Install dlib following the steps from: https://github.com/davisking/dlib
 ### MacOS
 ```bash
 pip install -e .
-pip install -r requirements.txt
+pip install -r requirements-mac.txt
 ```
