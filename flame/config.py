@@ -23,8 +23,14 @@ parser.add_argument(
     help='Dynamic contour embedding path for FLAME'
 )
 
-# FLAME hyper-parameters
+parser.add_argument(
+    '--tex_space_path',
+    type=str,
+    default='../data/flame_model/FLAME_texture.npz',
+    help='Texture space path for FLAME'
+)
 
+# FLAME hyper-parameters
 parser.add_argument(
     '--shape_params',
     type=int,
@@ -40,6 +46,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--tex_params',
+    type=int,
+    default=50,
+    help='the number of expression parameters'
+)
+
+parser.add_argument(
     '--pose_params',
     type=int,
     default=6,
@@ -47,7 +60,6 @@ parser.add_argument(
 )
 
 # Training hyper-parameters
-
 parser.add_argument(
     '--use_face_contour',
     default=True,
@@ -63,27 +75,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--optimize_eyeballpose',
-    default=True,  # False for For RingNet project
-    type=bool,
-    help='If true optimize for the eyeball pose.'
-)
-
-parser.add_argument(
-    '--optimize_neckpose',
-    default=True,  # False For RingNet project
-    type=bool,
-    help='If true optimize for the neck pose.'
-)
-
-parser.add_argument(
-    '--num_worker',
-    type=int,
-    default=4,
-    help='pytorch number worker.'
-)
-
-parser.add_argument(
     '--batch_size',
     type=int,
     default=1,
@@ -91,17 +82,80 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--ring_margin',
+    '--learning_rate_first_frame',
     type=float,
-    default=0.5,
-    help='ring margin.'
+    default=0.01,
+    help='learning rate for first frame fitting'
 )
 
 parser.add_argument(
-    '--ring_loss_weight',
+    '--num_opt_steps_first_frame',
+    type=int,
+    default=200,
+    help='optimizing steps for first frame fitting'
+)
+
+parser.add_argument(
+    '--learning_rate_subsequent_frames',
     type=float,
-    default=1.0,
-    help='weight on ring loss.'
+    default=0.001,
+    help='learning rate for subsequent frames fitting'
+)
+
+parser.add_argument(
+    '--num_opt_steps_subsequent_frames',
+    type=int,
+    default=50,
+    help='optimizing steps for subsequent frames fitting'
+)
+
+parser.add_argument(
+    '--landmark_weight',
+    type=float,
+    default=1e-2,
+    help='landmark loss weight'
+)
+
+parser.add_argument(
+    '--rgb_weight',
+    type=float,
+    default=1e-2,
+    help='color loss weight'
+)
+
+parser.add_argument(
+    '--point2point_weight',
+    type=float,
+    default=1e-3,
+    help='point to point loss weight'
+)
+
+parser.add_argument(
+    '--point2plane_weight',
+    type=float,
+    default=1e-3,
+    help='point to plane loss weight'
+)
+
+parser.add_argument(
+    'shape_weight',
+    type=float,
+    default=1e-8,
+    help='shape regularization strength'
+)
+
+parser.add_argument(
+    'exp_weight',
+    type=float,
+    default=1e-9,
+    help='expression regularization strength'
+)
+
+parser.add_argument(
+    'tex_weight',
+    type=float,
+    default=1e-8,
+    help='texture regularization strength'
 )
 
 

@@ -1,3 +1,4 @@
+import torch
 from pytorch3d.loss.chamfer import *
 from pytorch3d.loss.chamfer import _handle_pointcloud_input
 from pytorch3d.loss.chamfer import _validate_chamfer_reduction_inputs

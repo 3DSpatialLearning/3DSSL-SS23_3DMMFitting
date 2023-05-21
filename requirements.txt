@@ -6,3 +6,4 @@ smplx
 pyvista
 tensorboard
 opencv-python
+nvdiffrast @ git+https://github.com/NVlabs/nvdiffrast.git
