@@ -9,13 +9,9 @@ import dlib
     To download the predictor model, visit: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 """
 class DlibLandmarkDetector(nn.Module):
-    def __init__(self, path_to_dlib_detector_model: str = None, path_to_dlib_predictor_model: str = None):
+    def __init__(self, path_to_dlib_predictor_model: str = "data/checkpoints/shape_predictor_68_face_landmarks.dat"):
         super(DlibLandmarkDetector, self).__init__()
-        if path_to_dlib_detector_model is None:
-            self.detector = dlib.get_frontal_face_detector()
-        else:
-            self.detector = dlib.cnn_face_detection_model_v1(path_to_dlib_detector_model)
-        assert path_to_dlib_predictor_model is not None, "Path to dlib predictor model is None"
+        self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(path_to_dlib_predictor_model)
 
     def forward(self, image: np.ndarray) -> np.ndarray:
