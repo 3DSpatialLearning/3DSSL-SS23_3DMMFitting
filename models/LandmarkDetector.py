@@ -5,9 +5,11 @@ import dlib
 """
     Wrapper class for dlib's landmark detector.
     This class is used to detect 68 landmarks on a face image.
-    To download the detector model, visit: http://dlib.net/files/mmod_human_face_detector.dat.bz2 or use default one by passing None
+    To download the detector model, visit: https://dlib.net/files/mmod_human_face_detector.dat.bz2 or use default one by passing None
     To download the predictor model, visit: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 """
+
+
 class DlibLandmarkDetector(nn.Module):
     def __init__(self, path_to_dlib_predictor_model: str = "data/checkpoints/shape_predictor_68_face_landmarks.dat"):
         super(DlibLandmarkDetector, self).__init__()

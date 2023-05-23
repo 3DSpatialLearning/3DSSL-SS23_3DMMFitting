@@ -6,7 +6,7 @@ import nvdiffrast.torch as dr
 
 from enum import Enum
 from flame.FLAME import FLAME, FLAMETex
-from typing import Union, Tuple, List
+from typing import Union, Tuple
 
 
 class FittingMode(Enum):

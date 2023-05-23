@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray, E: np.ndarray) -> np.ndarray:
     """
     Backprojects a set of 2D pixels into 2D points using the given camera intrinsics and extrinsics.
@@ -16,13 +17,13 @@ def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray,
 
     # screen space to cam space
     points_homo = np.hstack((points, np.ones((len(points), 1)))).T
-    cam_coords = depths * (np.linalg.inv(K)@points_homo).T
+    cam_coords = depths * (np.linalg.inv(K) @ points_homo).T
 
     # camera space to world space
     cam_coords_homo = np.hstack((cam_coords, np.ones((len(points), 1))))
-    world_coords_homo = E@cam_coords_homo.T
+    world_coords_homo = E @ cam_coords_homo.T
     world_coords = world_coords_homo[:3, :].T
-    
+
     return world_coords
 
 

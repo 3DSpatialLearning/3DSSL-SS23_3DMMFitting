@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from flame.FLAME import FLAME
-from flame.config import get_config
+from config import get_config
 from utils.transform import rigid_transform_3d
 from torch.optim.lr_scheduler import ExponentialLR
 from tqdm import tqdm
