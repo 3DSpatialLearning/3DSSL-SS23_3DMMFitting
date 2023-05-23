@@ -1,4 +1,7 @@
 import torch
+
+from typing import List
+
 from pytorch3d.loss.chamfer import *
 from pytorch3d.loss.chamfer import _handle_pointcloud_input
 from pytorch3d.loss.chamfer import _validate_chamfer_reduction_inputs
@@ -156,3 +159,70 @@ def custom_chamfer_distance_single_direction(
     cham_normals = cham_norm_x if return_normals else None
 
     return cham_dist, cham_normals
+
+
+def landmark_distance(
+    source_landmarks: torch.Tensor,
+    dest_landmarks: torch.Tensor,
+    landmarks_mask: torch.Tensor
+) -> torch.Tensor:
+    """
+
+    :param source_landmarks: FloatTensor of shape (B, num_landmarks, D)
+    :param dest_landmarks: FloatTensor of shape (B, num_landmarks, D)
+    :param landmarks_mask: FloatTensor of shape (B, num_landmarks)
+    :return: Tensor giving the reduced l2 distance between the source
+    and destination landmarks
+    """
+
+    landmarks_distance = (source_landmarks - dest_landmarks).pow(2).sum(2)
+    landmarks_distance = landmarks_distance * landmarks_mask
+    landmarks_distance = landmarks_distance.sum() / source_landmarks.shape[0]
+    return landmarks_distance
+
+
+def pixel2pixel_distance(
+    source_pixels: List[torch.Tensor],
+    dest_pixels: List[torch.Tensor],
+) -> torch.Tensor:
+    """
+
+    :param source_pixels: list of FloatTensor of shape (num_pixels, D)
+    :param dest_pixels: list of FloatTensor of shape (num_pixels, D)
+    :return: Tensor giving the reduced pixel to pixel distance computed
+    as the reduced L2 distance between the pixel values
+    """
+    p2p_distance = torch.tensor(0, device=source_pixels[0].device, dtype=torch.float)
+
+    for source_pixel, dest_pixel in zip(source_pixels, dest_pixels):
+        p2p_distance += (source_pixel - dest_pixel).pow(2).sum(2).sum()
+
+    p2p_distance = p2p_distance / len(source_pixels)
+    return p2p_distance
+
+
+def point2plane_distance(
+    source_points: List[torch.Tensor],
+    source_normals: List[torch.Tensor],
+    dest_points: List[torch.Tensor],
+    dest_normals: List[torch.Tensor]
+) -> torch.Tensor:
+    """
+
+    :param source_points: list of FloatTensor of shape (num_pixels, D)
+    :param source_normals: list of FloatTensor of shape (num_pixels, D)
+    :param dest_points: list of FloatTensor of shape (num_pixels, D)
+    :param dest_normals: list of FloatTensor of shape (num_pixels, D)
+    :return: Tensor giving the reduced bidirectional point to plane
+    distance computed from source_point to gt_point and gt_point to
+    source_point
+    """
+    p2plane_distance = torch.tensor(0, device=source_points[0].device, dtype=torch.float)
+    for source_point, source_normal, dest_point, dest_normal in zip(source_points, source_normals, dest_points, dest_normals):
+        s2d_distance = ((source_point - dest_point) * dest_normal).sum(2).pow(2).sum()
+        d2s_distance = ((dest_point - source_point) * source_normal).sum(2).pow(2).sum()
+        p2plane_distance += s2d_distance + d2s_distance
+
+    p2plane_distance = p2plane_distance / len(source_points)
+    return p2plane_distance
+

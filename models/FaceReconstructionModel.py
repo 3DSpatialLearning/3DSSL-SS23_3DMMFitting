@@ -6,11 +6,13 @@ import nvdiffrast.torch as dr
 
 from enum import Enum
 from flame.FLAME import FLAME, FLAMETex
-from typing import Union, Tuple
+from typing import Union, Tuple, List
+
 
 class FittingMode(Enum):
     IMAGE = 0
     VIDEO = 1
+
 
 class FaceReconModel(nn.Module):
     def __init__(
@@ -87,11 +89,14 @@ class FaceReconModel(nn.Module):
 
     def optimize(
         self,
-        image: torch.Tensor,
-        depth: torch.Tensor,
+        images: torch.Tensor,
+        depths: torch.Tensor,
         trans_matrices: torch.Tensor,
-    ):
+        landmarks: torch.Tensor,
+        landmarks_mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         pass
+
 
 
 
