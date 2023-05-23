@@ -106,13 +106,14 @@ class CameraFrameDataset(Dataset):
                 pbar.set_description(f"Computing landmarks for camera {cam} and frame {frame}")
                 path_to_cam_folder = os.path.join(self.path_to_data, cam)
                 predicted_landmarks_dir = os.path.join(path_to_cam_folder, "predicted_landmarks")
+                camera_intrinsics = np.load(os.path.join(path_to_cam_folder, self.intrinsics_filename))
+                camera_extrinsics = np.load(os.path.join(path_to_cam_folder, self.extrinsics_filename))
                 if not os.path.exists(predicted_landmarks_dir):
                     os.makedirs(predicted_landmarks_dir)
                 image = cv2.imread(os.path.join(path_to_cam_folder, self.image_subdir, f"{frame}.png"))
                 depth = np.load(os.path.join(path_to_cam_folder, self.depth_subdir, f"{frame}.npy"))
                 landmark_2d = landmark_detector(image)
-                landmark_3d = backproject_points(landmark_2d, depth, self.camera_intrinsics,
-                                                         self.camera_extrinsics)
+                landmark_3d = backproject_points(landmark_2d, depth, camera_intrinsics, camera_extrinsics)
                 np.save(os.path.join(predicted_landmarks_dir, f"{frame}.npy"), landmark_3d)
 
     def num_cameras(self):

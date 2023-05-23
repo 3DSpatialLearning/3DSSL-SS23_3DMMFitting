@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from dataset.CameraFrameDataset import CameraSequenceDataset
+from dataset.CameraFrameDataset import CameraFrameDataset
 from utils.data import dict_tensor_to_np
 from utils.transform import backproject_points
 from models.LandmarkDetector import DlibLandmarkDetector
@@ -13,7 +13,7 @@ import pyvista as pv
 main_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(str(main_dir))
 
-CAMERA_DIR = "../data/toy_task/multi_frame_rgbd_fitting/222200037"
+DATA_DIR = "../data/toy_task/multi_frame_rgbd_fitting"
 DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
 DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
 
@@ -22,9 +22,9 @@ VISUALIZE_LANDMARKS_3D = False
 
 if __name__ == '__main__':
     print("Loading camera sequence data...")
-    camera_dataset = CameraSequenceDataset(path_to_cam_dir=CAMERA_DIR, has_gt_landmarks=True)
+    dataset = CameraFrameDataset(path_to_cam_dir=DATA_DIR, has_gt_landmarks=True)
     data_loader = DataLoader(
-        dataset=camera_dataset,
+        dataset=dataset,
         pin_memory=True,
         batch_size=1,
     )
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     print("Calculating landmarks...")
     for id, frame in enumerate(data_loader):
         frame = dict_tensor_to_np(frame)
-        image = frame['image']
+        image = frame['image'].squeeeze()
         landmarks_2d = landmark_detector(image)
         if VISUALIZE_2D:
             cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
@@ -45,11 +45,8 @@ if __name__ == '__main__':
             cv2.waitKey(0)
             cv2.destroyWindow(f"image {id}")
 
-        gt_landmarks = frame['landmarks']
-        estimated_landmarks = backproject_points(landmarks_2d, frame['depth'], camera_dataset.camera_intrinsics,
-                                                 camera_dataset.camera_extrinsics)
-
-
+        gt_landmarks = frame['gt_landmark'].squeeeze()
+        estimated_landmarks = backproject_points(landmarks_2d, frame['depth'].squeeeze(), frame['intrinsics'].squeeeze(), frame['extrinsics'].squeeeze())
 
         if VISUALIZE_LANDMARKS_3D:
             not_nan_indices = ~(np.isnan(gt_landmarks).any(axis=1))
