@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from dataset.CameraSequenceDataset import CameraSequenceDataset
+from dataset.CameraFrameDataset import CameraSequenceDataset
 from utils.data import dict_tensor_to_np
 from utils.transform import backproject_points
 from models.LandmarkDetector import DlibLandmarkDetector
@@ -18,7 +18,7 @@ DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
 DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
 
 VISUALIZE_2D = False
-VISUALIZE_LANDMARKS_3D = True
+VISUALIZE_LANDMARKS_3D = False
 
 if __name__ == '__main__':
     print("Loading camera sequence data...")
@@ -49,17 +49,17 @@ if __name__ == '__main__':
         estimated_landmarks = backproject_points(landmarks_2d, frame['depth'], camera_dataset.camera_intrinsics,
                                                  camera_dataset.camera_extrinsics)
 
-        not_nan_indices = ~(np.isnan(gt_landmarks).any(axis=1))
-        criterion = nn.MSELoss(reduction='mean')
-        error = criterion(torch.from_numpy(estimated_landmarks[not_nan_indices]),
-                          torch.from_numpy(gt_landmarks[not_nan_indices]))
-        error = error.item()
+
 
         if VISUALIZE_LANDMARKS_3D:
+            not_nan_indices = ~(np.isnan(gt_landmarks).any(axis=1))
+            criterion = nn.MSELoss(reduction='mean')
+            error = criterion(torch.from_numpy(estimated_landmarks[not_nan_indices]),
+                              torch.from_numpy(gt_landmarks[not_nan_indices]))
             plotter = pv.Plotter()
             plotter.add_mesh(pv.PolyData(gt_landmarks), color='red', point_size=5)
             plotter.add_mesh(pv.PolyData(estimated_landmarks), color='green', point_size=5)
-            plotter.add_text(f"Landmarks (Red: Ground Truth, Green: Estimated). Mean square error {error} ")
+            plotter.add_text(f"Landmarks (Red: Ground Truth, Green: Estimated). Mean square error {error.item()} ")
             plotter.add_axes(line_width=3, color='white', labels_off=False)
             plotter.camera_position = 'xy'
             plotter.show()

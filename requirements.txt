@@ -1,9 +1,11 @@
 numpy==1.23.1
+fire
 torch
 torchvision
-chumpy
+tensorboard
 smplx
 pyvista
-tensorboard
 opencv-python
 nvdiffrast @ git+https://github.com/NVlabs/nvdiffrast.git
+cmake
+dlib
