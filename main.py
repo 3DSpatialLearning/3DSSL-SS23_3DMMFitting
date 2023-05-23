@@ -1,15 +1,11 @@
 import fire
-
-from config import get_config
-
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
-
 from models.LandmarkDetector import DlibLandmarkDetector
-from models.FaceReconstructionModel import FaceReconModel
-
+import torch
 from torch.utils.data import DataLoader
 from torchvision.transforms.transforms import Compose as TransformCompose
+from flame.config import get_config as flame_config
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -27,29 +23,25 @@ from torchvision.transforms.transforms import Compose as TransformCompose
   - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
 """
 
-
 def main(
-        data_dir: str = "data/toy_task/multi_frame_rgbd_fitting",
+       data_dir: str = "data/toy_task/multi_frame_rgbd_fitting",
+       num_frames_for_shape_fitting: int = 1,
 ):
-    # data loading
-    landmark_detector = DlibLandmarkDetector()
-    transforms = TransformCompose([ToTensor()])
-    dataset = CameraFrameDataset(data_dir, has_gt_landmarks=False, transform=transforms)
-    dataset.precompute_landmarks(landmark_detector, force_precompute=False)
-    dataloader = DataLoader(dataset, batch_size=dataset.num_cameras(), shuffle=False, num_workers=0)
+  # data loading
+  landmark_detector = DlibLandmarkDetector()
+  transforms = TransformCompose([ToTensor()])
+  dataset = CameraFrameDataset(data_dir, has_gt_landmarks=False, transform=transforms)
+  dataset.precompute_landmarks(landmark_detector, force_precompute=False)
+  dataloader = DataLoader(dataset, batch_size=dataset.num_cameras(), shuffle=False, num_workers=0)
 
-    # create the FaceRecon model
-    face_recon_model_config = get_config()
-    face_recon_model = FaceReconModel(
-        face_model_config=face_recon_model_config,
-        device="cuda"
-    )
 
-    # fitting
-    for frame_num, frame_features in enumerate(dataloader):
-        print(frame_features)
-        pass
-
+  # fitting
+  device = 'cuda' if torch.cuda.is_available() else 'cpu'
+  shape = torch.nn.Parameter(torch.zeros(1, flame_config.shape_params).float().to(device))
+  exp = torch.nn.Parameter(torch.zeros(1, flame_config.expression_params).float().to(device))
+  pose = torch.nn.Parameter(torch.zeros(1, flame_config.pose_params).float().to(device))
+  for frame, frame_batch in enumerate(dataloader):
+    print(f"Processing frame {frame}")
 
 if __name__ == '__main__':
-    fire.Fire(main)
+  fire.Fire(main)

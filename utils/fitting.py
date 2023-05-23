@@ -13,7 +13,6 @@ from pytorch3d.ops import sample_points_from_meshes
 import random
 from torch.utils.tensorboard import SummaryWriter
 
-
 def fit_flame_model_to_input_point_cloud(
         input_data: dict[str, np.ndarray],
         steps: int,
