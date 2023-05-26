@@ -36,7 +36,6 @@ class FLAME(nn.Module):
 
     def __init__(self, config):
         super(FLAME, self).__init__()
-        print("creating the FLAME Decoder")
         with open(config.flame_model_path, 'rb') as f:
             self.flame_model = Struct(**pickle.load(f, encoding='latin1'))
         self.NECK_IDX = 1
@@ -204,7 +203,7 @@ class FLAME(nn.Module):
             Input:
                 shape_params: N X number of shape parameters
                 expression_params: N X number of expression parameters
-                pose_params: N X number of pose parameters
+                pose_params: N X number of pose parameters (axis angle representation for rotation)
             return:
                 vertices: N X V X 3
                 landmarks: N X number of landmarks X 3

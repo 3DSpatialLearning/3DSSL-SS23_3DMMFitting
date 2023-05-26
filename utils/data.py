@@ -1,7 +1,7 @@
-import os
 import numpy as np
-import torch
 import cv2
+
+# Deprecated
 
 def load_data(scale: float = 1.0, landmarks_path: str = None, points_path: str = None, normals_path: str = None, image_path: str = None):
     data = {}
@@ -23,20 +23,6 @@ def load_camera_data(intrinsics_path: str = None, extrinsics_path: str = None):
         data["extrinsics"] = np.load(extrinsics_path)
     return data
 
-"""
-    Load data from a set of directories. If these are not None, then the data will be loaded from the corresponding files resulting 
-    from the intersection of their file names.
-    The returned dictionary has the following structure (if the corresponding directory is not None):
-    {
-        id_1: {
-            "landmarks": np.array,
-            "points": np.array,
-            "normals": np.array,
-            "image": np.array
-        },
-        id_2: {...}
-"""
-
 def resize_data_images(data: dict[str, dict], sx: float = 1.0, sy: float = 1.0) -> dict[str, dict]:
     frames = data['frames']
     for id, frame in frames.items():
@@ -44,7 +30,3 @@ def resize_data_images(data: dict[str, dict], sx: float = 1.0, sy: float = 1.0) 
     data['frames'] = frames
     return data
 
-def dict_tensor_to_np(data: dict[str, torch.tensor]) -> dict[str, np.array]:
-    for k, v in data.items():
-        data[k] = v.detach().cpu().squeeze().numpy()
-    return data

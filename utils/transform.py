@@ -1,12 +1,61 @@
 import numpy as np
+import cv2
+from scipy.spatial import distance
+
+def rotation_matrix_to_axis_angle(rotation: np.ndarray) -> np.ndarray:
+    assert rotation.shape == (3, 3), "Rotation matrix must be 3x3"
+    axis_angle, _ = cv2.Rodrigues(rotation)
+    return axis_angle.squeeze()
+
+def intrinsics_to_projection(intrinsics: np.ndarray, znear: float =.1, zfar: float = 10.) -> np.ndarray:
+    """
+    Converts the given intrinsics matrix to a OpenGL projection matrix.
+    :param intrinsics: 3x3
+    :return: 4x4 OpenGL projection matrix
+    """
+    assert intrinsics.shape == (3, 3)
+    fx, fy = intrinsics[0, 0], intrinsics[1, 1]
+    cx, cy = intrinsics[0, 2], intrinsics[1, 2]
+    sx = intrinsics[0, 1]
+    w, h = round(intrinsics[0, 2] * 2), round(intrinsics[1, 2] * 2)
+    projection_matrix = np.array([[2 * fx / w, -2 * sx / w,(2 * cx - w) / w, 0],
+                                  [0, -2 * fy / h, (2 * cy - h) / h, 0],
+                                  [0, 0, -(zfar + znear) / (zfar - znear), -2 * (zfar * znear) / (zfar - znear)],
+                                  [0, 0, -1, 0]])
+    return projection_matrix
+
+def filter_outliers_landmarks(landmark: np.ndarray, threshold: float = 0.0) -> np.ndarray:
+    """
+    Filters out the outliers from the landmarks by setting corresponding outlier positions to nan.
+    :param landmark: Nx3
+    :return: Nx3
+    """
+    dist_matrix = distance.cdist(landmark, landmark)
+    np.fill_diagonal(dist_matrix, np.inf)
+    min_distances = np.min(dist_matrix, axis=1)
+    landmark[min_distances == 0] = np.nan
+    landmark[min_distances > threshold] = np.nan
+    return landmark
+
+def get_coordinates_from_depth_map_by_threshold(depth_map: np.ndarray, threshold: float = 0.0) -> np.ndarray:
+    """
+    Returns the coordinates of the pixels in the depth map that are above the given threshold.
+    :param depth_map HxW
+    :param threshold float
+    :return: Nx2 array of pixel coordinates
+    """
+    ys, xs = np.where(depth_map > threshold)
+    pixel_coordinates = np.column_stack((xs, ys))
+    return pixel_coordinates
 
 def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray, E: np.ndarray) -> np.ndarray:
     """
     Backprojects a set of 2D pixels into 2D points using the given camera intrinsics and extrinsics.
     :param points: 2D points Nx2
+    :param depth_map: Depth map of the image HxW
     :param intrinsics: Camera intrinsics 3x3
     :param extrinsics: Camera extrinsics 4x4
-    :return: 3D points
+    :return: Nx3 points in world space
     """
     assert points.shape[1] == 2
     assert K.shape == (3, 3)
