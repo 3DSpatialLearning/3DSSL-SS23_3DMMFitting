@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from dataset.CameraFrameDataset import CameraFrameDataset
-from utils.data import dict_tensor_to_np
+from dataset.utils import dict_tensor_to_np
 from utils.transform import backproject_points
 from models.LandmarkDetector import DlibLandmarkDetector
 import os

@@ -1,36 +1,33 @@
 import argparse
 
-parser = argparse.ArgumentParser(description='FLAME model')
+parser = argparse.ArgumentParser(description='FLAME fitting config')
+
+
+#################### FLAME args ####################
 
 parser.add_argument(
     '--flame_model_path',
     type=str,
-    default='./data/flame_model/generic_model.pkl',
+    default='data/flame_model/generic_model.pkl',
     help='flame model path'
 )
 
 parser.add_argument(
     '--static_landmark_embedding_path',
     type=str,
-    default='./data/flame_model/flame_static_embedding.pkl',
+    default='data/flame_model/flame_static_embedding.pkl',
     help='Static landmark embeddings path for FLAME'
 )
 
 parser.add_argument(
     '--dynamic_landmark_embedding_path',
     type=str,
-    default='./data/flame_model/flame_dynamic_embedding.npy',
+    default='data/flame_model/flame_dynamic_embedding.npy',
     help='Dynamic contour embedding path for FLAME'
 )
 
-parser.add_argument(
-    '--tex_space_path',
-    type=str,
-    default='./data/flame_model/FLAME_texture.npz',
-    help='Texture space path for FLAME'
-)
-
 # FLAME hyper-parameters
+
 parser.add_argument(
     '--shape_params',
     type=int,
@@ -46,20 +43,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--tex_params',
-    type=int,
-    default=50,
-    help='the number of expression parameters'
-)
-
-parser.add_argument(
     '--pose_params',
     type=int,
     default=6,
     help='the number of pose parameters'
 )
 
-# Training hyper-parameters
+
 parser.add_argument(
     '--use_face_contour',
     default=True,
@@ -81,84 +71,55 @@ parser.add_argument(
     help='Training batch size.'
 )
 
-parser.add_argument(
-    '--learning_rate_first_frame',
-    type=float,
-    default=0.01,
-    help='learning rate for first frame fitting'
-)
+####################### Other args #######################
 
 parser.add_argument(
-    '--num_opt_steps_first_frame',
+    '--steps',
     type=int,
     default=200,
-    help='optimizing steps for first frame fitting'
+    help='Per frame optimizing steps'
 )
 
 parser.add_argument(
-    '--learning_rate_subsequent_frames',
+    '--lr',
     type=float,
-    default=0.001,
-    help='learning rate for subsequent frames fitting'
+    default=1e-2,
+    help='Learning rate'
 )
 
 parser.add_argument(
-    '--num_opt_steps_subsequent_frames',
-    type=int,
-    default=50,
-    help='optimizing steps for subsequent frames fitting'
+    '--scan_to_mesh_weight',
+    type=float,
+    default=2.0,
+    help='Scan to mesh term weight'
 )
 
 parser.add_argument(
     '--landmark_weight',
     type=float,
     default=1e-2,
-    help='landmark loss weight'
+    help='Landmark term weight'
 )
 
 parser.add_argument(
-    '--rgb_weight',
-    type=float,
-    default=1e-2,
-    help='color loss weight'
-)
-
-parser.add_argument(
-    '--point2point_weight',
-    type=float,
-    default=1e-3,
-    help='point to point loss weight'
-)
-
-parser.add_argument(
-    '--point2plane_weight',
-    type=float,
-    default=1e-3,
-    help='point to plane loss weight'
-)
-
-parser.add_argument(
-    '--shape_weight',
+    '--shape_regularization_weight',
     type=float,
     default=1e-8,
-    help='shape regularization strength'
+    help='Shape regularization weight'
 )
 
 parser.add_argument(
-    '--exp_weight',
+    '--exp_regularization_weight',
     type=float,
     default=1e-9,
-    help='expression regularization strength'
+    help='Expression regularization weight'
 )
 
-parser.add_argument(
-    '--tex_weight',
-    type=float,
-    default=1e-8,
-    help='texture regularization strength'
-)
-
-
-def get_config():
+def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
     config = parser.parse_args()
+    config.flame_model_path = path_to_data_dir + config.flame_model_path
+    config.static_landmark_embedding_path = path_to_data_dir + config.static_landmark_embedding_path
+    config.dynamic_landmark_embedding_path = path_to_data_dir + config.dynamic_landmark_embedding_path
+    assert config.shape_params > 0 and config.shape_params <= 300, "Shape params should be between 1 and 300"
+    assert config.expression_params > 0 and config.expression_params <= 100, "Shape params should be between 1 and 100"
     return config
