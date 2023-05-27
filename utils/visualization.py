@@ -1,6 +1,7 @@
 import numpy as np
 import pyvista as pv
 
+
 def visualize_point_clouds(point_clouds: list[np.ndarray], colors: list[str] = None):
     plotter = pv.Plotter()
     for i, points in enumerate(point_clouds):
@@ -8,6 +9,7 @@ def visualize_point_clouds(point_clouds: list[np.ndarray], colors: list[str] = N
             color = colors[i]
         plotter.add_mesh(pv.PolyData(points), color=color, point_size=3)
     plotter.show()
+
 
 def visualize_3d_face_model(points: np.ndarray, faces: np.ndarray, screenshot: bool = False,
                                         screenshot_path: str = None):

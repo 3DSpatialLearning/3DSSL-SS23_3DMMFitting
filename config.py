@@ -2,7 +2,6 @@ import argparse
 
 parser = argparse.ArgumentParser(description='FLAME fitting config')
 
-
 #################### FLAME args ####################
 
 parser.add_argument(
@@ -24,6 +23,13 @@ parser.add_argument(
     type=str,
     default='data/flame_model/flame_dynamic_embedding.npy',
     help='Dynamic contour embedding path for FLAME'
+)
+
+parser.add_argument(
+    '--tex_space_path',
+    type=str,
+    default='data/flame_model/FLAME_texture.npz',
+    help='Texture space path for FLAME'
 )
 
 # FLAME hyper-parameters
@@ -49,6 +55,12 @@ parser.add_argument(
     help='the number of pose parameters'
 )
 
+parser.add_argument(
+    '--tex_params',
+    type=int,
+    default=50,
+    help='the number of expression parameters'
+)
 
 parser.add_argument(
     '--use_face_contour',
@@ -71,20 +83,27 @@ parser.add_argument(
     help='Training batch size.'
 )
 
-####################### Other args #######################
+####################### Optimization related args #######################
 
 parser.add_argument(
-    '--steps',
-    type=int,
-    default=200,
-    help='Per frame optimizing steps'
+    '--coarse2fine_resolutions',
+    type=list,
+    default=[224, 448, 760],
+    help='resolutions used for the coarse to fine optimization strategy'
 )
 
 parser.add_argument(
-    '--lr',
-    type=float,
-    default=1e-2,
-    help='Learning rate'
+    '--coarse2fine_lrs',
+    type=list,
+    default=[1e-3, 5e-4, 1-4],
+    help='learning rate associated to every level'
+)
+
+parser.add_argument(
+    '--coarse2fine_opt_steps',
+    type=list,
+    default=[10, 20, 30],
+    help='number of optimization steps associated to every level'
 )
 
 parser.add_argument(
@@ -115,11 +134,40 @@ parser.add_argument(
     help='Expression regularization weight'
 )
 
-def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
+parser.add_argument(
+    '--tex_regularization_weight',
+    type=float,
+    default=1e-9,
+    help='Texture regularization weight'
+)
+
+parser.add_argument(
+    '--rgb_weight',
+    type=float,
+    default=1e-2,
+    help='color loss weight'
+)
+
+parser.add_argument(
+    '--point2point_weight',
+    type=float,
+    default=1e-3,
+    help='point to point loss weight'
+)
+
+parser.add_argument(
+    '--point2plane_weight',
+    type=float,
+    default=1e-3,
+    help='point to plane loss weight'
+)
+
+
+def get_config(path_to_data_dir: str = '') -> argparse.Namespace:
     config = parser.parse_args()
     config.flame_model_path = path_to_data_dir + config.flame_model_path
     config.static_landmark_embedding_path = path_to_data_dir + config.static_landmark_embedding_path
     config.dynamic_landmark_embedding_path = path_to_data_dir + config.dynamic_landmark_embedding_path
-    assert config.shape_params > 0 and config.shape_params <= 300, "Shape params should be between 1 and 300"
-    assert config.expression_params > 0 and config.expression_params <= 100, "Shape params should be between 1 and 100"
+    assert 0 < config.shape_params <= 300, "Shape params should be between 1 and 300"
+    assert 0 < config.expression_params <= 100, "Shape params should be between 1 and 100"
     return config

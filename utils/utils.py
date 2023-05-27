@@ -1,15 +1,12 @@
-from typing import Union
+def resize_long_side(
+    orig_shape: tuple[int, int],
+    dest_len: int,
+    stride: int = 8
+) -> tuple[int, int]:
+    long_side_length = max(orig_shape[0], orig_shape[1])
+    scale = dest_len / long_side_length
 
-
-# this must be solved
-def check_size(
-    shape: Union[int, tuple],
-    stride: int
-) -> Union[int, tuple]:
-    if isinstance(shape, int):
-        residual = shape % stride
-        return residual + shape
-    else:
-        residual_width = shape[0] % stride
-        residual_height = shape[1] % stride
-        return shape[0] + residual_width, shape[1] + residual_height
+    resized_h, resized_w = round(orig_shape[0] * scale), round(orig_shape[1] * scale)
+    resized_h -= resized_h % stride
+    resized_w -= resized_w % stride
+    return resized_h, resized_w

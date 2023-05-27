@@ -1,14 +1,18 @@
 import fire
 import torch
+import numpy as np
+import cv2
+
 from torch.utils.data import DataLoader
 from torchvision.transforms.transforms import Compose as TransformCompose
 
 from config import get_config
+
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
+
 from models.LandmarkDetector import DlibLandmarkDetector
-from flame.FLAME import FLAME
-from utils.fitting import fit_flame_to_batched_frame_features
+from models.FaceReconstructionModel import FaceReconModel
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -26,15 +30,12 @@ from utils.fitting import fit_flame_to_batched_frame_features
   - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
 """
 
+
 def main(
         cam_data_dir: str = "data/toy_task/multi_frame_rgbd_fitting",
         num_frames_for_shape_fitting: int = 3,
-        device: str = None,
 ):
     config = get_config()
-
-    if device is None:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # data loading
     landmark_detector = DlibLandmarkDetector()
@@ -43,28 +44,42 @@ def main(
     dataset.precompute_landmarks(landmark_detector, force_precompute=False)
     dataloader = DataLoader(dataset, batch_size=dataset.num_cameras(), shuffle=False, num_workers=0)
 
-    # FLAME related variables
-    flame_model = FLAME(config)
-    flame_model.to(device)
-    shape = torch.nn.Parameter(torch.zeros(1, config.shape_params).float().to(device))
-    exp = torch.nn.Parameter(torch.zeros(1, config.expression_params).float().to(device))
-    pose = torch.nn.Parameter(torch.zeros(1, config.pose_params).float().to(device))
+    # get camera settings
+    first_frame_features = next(iter(dataloader))
 
-    # fitting
-    for frame, batch_features in enumerate(dataloader):
-        print(f"Processing frame {frame}")
-        if frame >= num_frames_for_shape_fitting:
-            shape.requires_grad = False
-        shape, exp, pose = fit_flame_to_batched_frame_features(
-            frame,
-            flame_model,
-            shape,
-            exp,
-            pose,
-            batch_features,
-            device,
-            config
-        )
+    extrinsic_matrices = first_frame_features["extrinsics"]
+    intrinsic_matrices = first_frame_features["intrinsics"]
+
+    # get face reconstruction model
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    face_recon_model = FaceReconModel(
+        face_model_config=config,
+        orig_img_shape=first_frame_features["image"].shape[2:],
+        device=device,
+    )
+    face_recon_model.to(device)
+
+    # set transformation matrices for projection
+    face_recon_model.set_transformation_matrices(
+        extrinsic_matrices=extrinsic_matrices,
+        intrinsic_matrices=intrinsic_matrices,
+    )
+
+    # compute the initial alignment
+    gt_landmark = first_frame_features["gt_landmark"][0]
+    face_recon_model.set_initial_pose(gt_landmark)
+
+    for frame_num, frame_features in enumerate(dataloader):
+        color, depth = face_recon_model.optimize(frame_features)
+        depth = depth.squeeze().detach().cpu().numpy()
+        color = color.squeeze().detach().cpu().numpy()
+        cv2.imshow("img", color.transpose(1, 2, 0))
+        cv2.waitKey(0)
+        print(np.max(depth))
+        print((np.max(color)))
+        break
+
 
 if __name__ == '__main__':
-  fire.Fire(main)
+    fire.Fire(main)

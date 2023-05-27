@@ -1,28 +1,35 @@
 import numpy as np
 import cv2
+import torch
 from scipy.spatial import distance
+
 
 def rotation_matrix_to_axis_angle(rotation: np.ndarray) -> np.ndarray:
     assert rotation.shape == (3, 3), "Rotation matrix must be 3x3"
     axis_angle, _ = cv2.Rodrigues(rotation)
     return axis_angle.squeeze()
 
-def intrinsics_to_projection(intrinsics: np.ndarray, znear: float =.1, zfar: float = 10.) -> np.ndarray:
+
+def intrinsics_to_projection(intrinsics: torch.Tensor, resolution: tuple[int, int], znear: float = .01, zfar: float = 10.) -> torch.Tensor:
     """
     Converts the given intrinsics matrix to a OpenGL projection matrix.
     :param intrinsics: 3x3
     :return: 4x4 OpenGL projection matrix
     """
     assert intrinsics.shape == (3, 3)
-    fx, fy = intrinsics[0, 0], intrinsics[1, 1]
-    cx, cy = intrinsics[0, 2], intrinsics[1, 2]
+    fx, fy = intrinsics[0, 0] * (resolution[1]/(intrinsics[0, 2] * 2)), intrinsics[1, 1] * (resolution[0]/(intrinsics[1, 2] * 2))
+    cx, cy = resolution[1] / 2, resolution[0] / 2
     sx = intrinsics[0, 1]
-    w, h = round(intrinsics[0, 2] * 2), round(intrinsics[1, 2] * 2)
-    projection_matrix = np.array([[2 * fx / w, -2 * sx / w,(2 * cx - w) / w, 0],
-                                  [0, -2 * fy / h, (2 * cy - h) / h, 0],
-                                  [0, 0, -(zfar + znear) / (zfar - znear), -2 * (zfar * znear) / (zfar - znear)],
-                                  [0, 0, -1, 0]])
+    w, h = resolution[1], resolution[0]
+
+    projection_matrix = torch.Tensor(
+        [[2 * fx / w, -2 * sx / w, (w - 2 * cx) / w, 0],
+         [0, -2 * fy / h, (h - 2 * cy) / h, 0],
+         [0, 0, -(zfar + znear) / (zfar - znear), -2 * (zfar * znear) / (zfar - znear)],
+         [0, 0, -1, 0]]
+    )
     return projection_matrix
+
 
 def filter_outliers_landmarks(landmark: np.ndarray, threshold: float = 0.0) -> np.ndarray:
     """
@@ -36,6 +43,7 @@ def filter_outliers_landmarks(landmark: np.ndarray, threshold: float = 0.0) -> n
     landmark[min_distances == 0] = np.nan
     landmark[min_distances > threshold] = np.nan
     return landmark
+
 
 def get_coordinates_from_depth_map_by_threshold(depth_map: np.ndarray, threshold: float = 0.0) -> np.ndarray:
     """

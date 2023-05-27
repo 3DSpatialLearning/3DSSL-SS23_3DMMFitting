@@ -2,12 +2,14 @@ from dataclasses import dataclass, field
 import torch
 from torchvision import transforms
 
+
 @dataclass
 class ToTensor:
     to_tensor: transforms.ToTensor = field(default_factory=transforms.ToTensor)
     normalize: bool = True
+
     def __call__(self, features: dict) -> dict:
-        features["image"] = self.to_tensor(features["image"])   # H x W x C -> C x H x W
+        features["image"] = self.to_tensor(features["image"])  # H x W x C -> C x H x W
         if not self.normalize:
             features["image"] *= 255.
         features["consistency"] = torch.from_numpy(features["consistency"])
