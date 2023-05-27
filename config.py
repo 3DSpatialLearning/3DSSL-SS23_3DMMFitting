@@ -5,28 +5,28 @@ parser = argparse.ArgumentParser(description='FLAME model')
 parser.add_argument(
     '--flame_model_path',
     type=str,
-    default='../data/flame_model/generic_model.pkl',
+    default='./data/flame_model/generic_model.pkl',
     help='flame model path'
 )
 
 parser.add_argument(
     '--static_landmark_embedding_path',
     type=str,
-    default='../data/flame_model/flame_static_embedding.pkl',
+    default='./data/flame_model/flame_static_embedding.pkl',
     help='Static landmark embeddings path for FLAME'
 )
 
 parser.add_argument(
     '--dynamic_landmark_embedding_path',
     type=str,
-    default='../data/flame_model/flame_dynamic_embedding.npy',
+    default='./data/flame_model/flame_dynamic_embedding.npy',
     help='Dynamic contour embedding path for FLAME'
 )
 
 parser.add_argument(
     '--tex_space_path',
     type=str,
-    default='../data/flame_model/FLAME_texture.npz',
+    default='./data/flame_model/FLAME_texture.npz',
     help='Texture space path for FLAME'
 )
 
@@ -138,21 +138,21 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    'shape_weight',
+    '--shape_weight',
     type=float,
     default=1e-8,
     help='shape regularization strength'
 )
 
 parser.add_argument(
-    'exp_weight',
+    '--exp_weight',
     type=float,
     default=1e-9,
     help='expression regularization strength'
 )
 
 parser.add_argument(
-    'tex_weight',
+    '--tex_weight',
     type=float,
     default=1e-8,
     help='texture regularization strength'
