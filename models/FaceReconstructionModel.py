@@ -68,8 +68,16 @@ class FaceReconModel(nn.Module):
         # Get world to cam matrices
         self.world_to_cam = []
 
+        rad = np.pi
+        rot_y = torch.Tensor(
+            [[np.cos(rad), 0, np.sin(rad), 0],
+             [0, 1, 0, 0],
+             [-np.sin(rad), 0, np.cos(rad), 0],
+             [0, 0, 0, 1]]
+        ).to(extrinsic_matrices.device)
+
         for extrinsic_matrix in extrinsic_matrices:
-            self.world_to_cam.append((torch.inverse(extrinsic_matrix)).t())
+            self.world_to_cam.append((rot_y @ torch.inverse(extrinsic_matrix)).t())
         self.world_to_cam = torch.stack(self.world_to_cam).float().to(self.device)
 
         # Get cam to ndc matrices
@@ -125,9 +133,7 @@ class FaceReconModel(nn.Module):
         landmarks = torch.cat((landmarks, torch.ones(landmarks.shape[0], landmarks.shape[1], 1).to(self.device)), dim=-1)
 
         vertices_cam = torch.matmul(vertices, world_to_cam)
-        vertices_cam[..., 0:3] = -vertices_cam[..., 0:3]
         landmarks_cam = torch.matmul(landmarks, world_to_cam)
-        landmarks_cam[..., 0:3] = -landmarks_cam[..., 0:3]
         return vertices_cam, landmarks_cam
 
     def _project_to_ndc_space(

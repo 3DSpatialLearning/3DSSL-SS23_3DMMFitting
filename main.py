@@ -76,7 +76,7 @@ def main(
         color = color.squeeze().detach().cpu().numpy()
         cv2.imshow("img", color.transpose(1, 2, 0))
         cv2.waitKey(0)
-        print(np.max(depth))
+        print(np.min(depth))
         print((np.max(color)))
         break
 

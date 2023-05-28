@@ -24,7 +24,7 @@ def intrinsics_to_projection(intrinsics: torch.Tensor, resolution: tuple[int, in
 
     projection_matrix = torch.Tensor(
         [[2 * fx / w, -2 * sx / w, (w - 2 * cx) / w, 0],
-         [0, -2 * fy / h, (h - 2 * cy) / h, 0],
+         [0, 2 * fy / h, (-h + 2 * cy) / h, 0],
          [0, 0, -(zfar + znear) / (zfar - znear), -2 * (zfar * znear) / (zfar - znear)],
          [0, 0, -1, 0]]
     )
