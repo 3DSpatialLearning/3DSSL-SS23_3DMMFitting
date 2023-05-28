@@ -74,10 +74,9 @@ def main(
         color, depth = face_recon_model.optimize(frame_features)
         depth = depth.squeeze().detach().cpu().numpy()
         color = color.squeeze().detach().cpu().numpy()
-        cv2.imshow("img", color.transpose(1, 2, 0))
+        print(np.max(color))
+        cv2.imshow("img", color.transpose(1, 2, 0)[:,:,::-1])
         cv2.waitKey(0)
-        print(np.min(depth))
-        print((np.max(color)))
         break
 
 

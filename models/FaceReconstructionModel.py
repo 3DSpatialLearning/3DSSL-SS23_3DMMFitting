@@ -3,9 +3,12 @@ import torch.nn as nn
 import numpy as np
 import argparse
 import nvdiffrast.torch as dr
+import pickle
+
+from typing import Tuple
+from pytorch3d.io import load_obj
 
 from flame.FLAME import FLAME, FLAMETex
-from typing import Tuple
 from utils.transform import intrinsics_to_projection
 from utils.utils import resize_long_side
 from utils.transform import rigid_transform_3d, rotation_matrix_to_axis_angle
@@ -34,6 +37,29 @@ class FaceReconModel(nn.Module):
 
         # Render-related settings
         self.glctx = dr.RasterizeCudaContext(device=device)
+        _, faces, aux = load_obj(face_model_config.head_template_mesh_path, load_textures=False, device=self.device)
+        self.uvcoords = aux.verts_uvs[None, ...]
+        self.uvfaces = faces.textures_idx.int().contiguous()
+
+        with open(face_model_config.flame_masks_path, 'rb') as f:
+            masks = pickle.load(f, encoding='latin1')
+
+            faces = self.faces.cpu()
+            uvfaces = self.uvfaces.cpu()
+
+            face_verts = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"]])
+            face_faces = []
+            face_uvfaces = []
+
+            for i, face, in enumerate(faces):
+                for face_vert in face:
+                    if int(face_vert) in face_verts:
+                        face_faces.append(face)
+                        face_uvfaces.append(uvfaces[i])
+                        break
+
+            self.face_uvfaces = torch.stack(face_uvfaces).int().to(self.device).contiguous()
+            self.face_faces = torch.stack(face_faces).int().to(self.device).contiguous()
 
         # Optimize-related settings
         self.coarse2fine_lrs = face_model_config.coarse2fine_lrs
@@ -153,11 +179,14 @@ class FaceReconModel(nn.Module):
         albedos: torch.Tensor,
         resolution: Tuple[int, int]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        rast_out, _ = dr.rasterize(self.glctx, verts_ndc, self.faces, resolution=resolution)
-        color, _ = dr.interpolate(albedos, rast_out, self.faces)
+
+        rast_out, _ = dr.rasterize(self.glctx, verts_ndc, self.face_faces, resolution=resolution)
+        texc, _ = dr.interpolate(self.uvcoords, rast_out, self.face_uvfaces)
+        color = dr.texture(albedos, 1-texc, filter_mode='linear')
+        color = color * torch.clamp(rast_out[..., -1:], 0, 1)
         color = color.permute(0, 3, 1, 2)
 
-        depth, _ = dr.interpolate(verts_cam[..., 2:3].contiguous(), rast_out, self.faces)
+        depth, _ = dr.interpolate(verts_cam[..., 2:3].contiguous(), rast_out, self.face_faces)
         depth = depth.permute(0, 3, 1, 2)
 
         return color, depth
@@ -169,13 +198,14 @@ class FaceReconModel(nn.Module):
 
         # Get vertices in cam space and compute vertices attributes
         vertices_cam, landmarks_cam = self._project_to_cam_space(self.world_to_cam)
-        # albedos = self.texture_model(self.tex_coeffs) / 255.
-        albedos = torch.rand(1, vertices_cam.shape[1], 3).to(self.device)
+        albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
 
         for resolution, lr, opt_steps, cam2ndc in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs, self.coarse2fine_opt_steps, self.cam_to_ndc):
             vertices_ndc, landmarks_ndc = self._project_to_ndc_space(vertices_cam, landmarks_cam, cam2ndc)
             color, depth = self._render(vertices_cam, vertices_ndc, albedos, resolution)
 
+            # Compute losses
+            input_color = frame_features[]
         return color, depth
 
 

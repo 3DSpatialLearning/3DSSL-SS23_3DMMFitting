@@ -32,6 +32,19 @@ parser.add_argument(
     help='Texture space path for FLAME'
 )
 
+parser.add_argument(
+    '--head_template_mesh_path',
+    type=str,
+    default='data/flame_model/head_template_mesh.obj',
+    help='head template mesh for FLAME'
+)
+
+parser.add_argument(
+    '--flame_masks_path',
+    type=str,
+    default='data/flame_model/FLAME_masks.pkl',
+    help='flame masks'
+)
 # FLAME hyper-parameters
 
 parser.add_argument(

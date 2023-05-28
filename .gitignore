@@ -162,6 +162,7 @@ cython_debug/
 # ignore flame
 *.pkl
 *.npz
+*.obj
 
 # ignore npy and rgb
 *.npy
