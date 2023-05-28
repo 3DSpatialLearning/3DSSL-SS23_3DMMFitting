@@ -96,7 +96,7 @@ class CameraFrameDataset(Dataset):
             "consistency": np.load(os.path.join(path, self.consistency_subdir, f"{frame_id}.npy")),
             "depth": np.load(os.path.join(path, self.depth_subdir, f"{frame_id}.npy")),
             "normal": np.load(os.path.join(path, self.normal_subdir, f"{frame_id}.npy")),
-            "image": cv2.imread(os.path.join(path, self.image_subdir, f"{frame_id}.png")),
+            "image": cv2.cvtColor(cv2.imread(os.path.join(path, self.image_subdir, f"{frame_id}.png")), cv2.COLOR_BGR2RGB),
             "intrinsics": np.load(os.path.join(path, self.intrinsics_filename)),
             "extrinsics": np.load(os.path.join(path, self.extrinsics_filename))
         }
@@ -113,8 +113,7 @@ class CameraFrameDataset(Dataset):
                                                                           0.03).astype(np.float32)
 
         # filter out low consistency points
-        features["depth"][features["consistency"] < self.consistency_threshold] = 0
-        features["normal"][features["consistency"] < self.consistency_threshold] = [0, 0, 0]
+        features["pixel_mask"] = np.where(features["consistency"] < self.consistency_threshold, 0, 1)[..., None]
 
         # backproject points and get their normals (could be removed later when loss is computed on image space)
         if self.need_backprojection:

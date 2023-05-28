@@ -67,14 +67,13 @@ def main(
     )
 
     # compute the initial alignment
-    gt_landmark = first_frame_features["gt_landmark"][0]
+    gt_landmark = first_frame_features["predicted_landmark_3d"][0]
     face_recon_model.set_initial_pose(gt_landmark)
 
     for frame_num, frame_features in enumerate(dataloader):
         color, depth = face_recon_model.optimize(frame_features)
-        depth = depth.squeeze().detach().cpu().numpy()
-        color = color.squeeze().detach().cpu().numpy()
-        print(np.max(color))
+        depth = depth[0].detach().cpu().numpy()
+        color = color[0].detach().cpu().numpy()
         cv2.imshow("img", color.transpose(1, 2, 0)[:,:,::-1])
         cv2.waitKey(0)
         break

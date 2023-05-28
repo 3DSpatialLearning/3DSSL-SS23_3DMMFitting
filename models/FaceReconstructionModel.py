@@ -4,22 +4,26 @@ import numpy as np
 import argparse
 import nvdiffrast.torch as dr
 import pickle
+import torch.nn.functional as F
 
+from tqdm import tqdm
 from typing import Tuple
 from pytorch3d.io import load_obj
+from torch.optim.lr_scheduler import ExponentialLR
 
 from flame.FLAME import FLAME, FLAMETex
 from utils.transform import intrinsics_to_projection
 from utils.utils import resize_long_side
 from utils.transform import rigid_transform_3d, rotation_matrix_to_axis_angle
+from utils.loss import *
 
 
 class FaceReconModel(nn.Module):
     def __init__(
-        self,
-        face_model_config: argparse.Namespace,
-        orig_img_shape: tuple[int, int],
-        device: str = "cuda",
+            self,
+            face_model_config: argparse.Namespace,
+            orig_img_shape: tuple[int, int],
+            device: str = "cuda",
     ):
         super(FaceReconModel, self).__init__()
         self.device = device
@@ -81,15 +85,15 @@ class FaceReconModel(nn.Module):
         self.cam_to_ndc = None
 
         self.coarse2fine_resolutions = list(map(lambda x: resize_long_side(
-                                                            orig_shape=orig_img_shape,
-                                                            dest_len=x
-                                            ),
-                                           face_model_config.coarse2fine_resolutions))
+            orig_shape=orig_img_shape,
+            dest_len=x
+        ),
+                                                face_model_config.coarse2fine_resolutions))
 
     def set_transformation_matrices(
-        self,
-        extrinsic_matrices: torch.Tensor,
-        intrinsic_matrices: torch.Tensor,
+            self,
+            extrinsic_matrices: torch.Tensor,
+            intrinsic_matrices: torch.Tensor,
     ) -> None:
         # Get world to cam matrices
         self.world_to_cam = []
@@ -116,8 +120,8 @@ class FaceReconModel(nn.Module):
             self.cam_to_ndc.append(cam_to_ndc)
 
     def set_initial_pose(
-        self,
-        input_landmarks: torch.Tensor
+            self,
+            input_landmarks: torch.Tensor
     ):
         _, landmarks = self.face_model(
             shape_params=self.shape_coeffs,
@@ -135,7 +139,8 @@ class FaceReconModel(nn.Module):
         r, t = rigid_transform_3d(input_landmarks.T, landmarks.T)
         r = rotation_matrix_to_axis_angle(r)
 
-        self.pose_coeffs = nn.Parameter(torch.from_numpy(np.concatenate([r, t[:, 0]])[None, ...]).float().to(self.exp_coeffs.device))
+        self.pose_coeffs = nn.Parameter(
+            torch.from_numpy(np.concatenate([r, t[:, 0]])[None, ...]).float().to(self.exp_coeffs.device))
 
     def get_landmarks(self) -> torch.Tensor:
         _, landmarks = self.face_model(
@@ -146,8 +151,8 @@ class FaceReconModel(nn.Module):
         return landmarks
 
     def _project_to_cam_space(
-        self,
-        world_to_cam: torch.Tensor
+            self,
+            world_to_cam: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         vertices, landmarks = self.face_model(
             shape_params=self.shape_coeffs,
@@ -156,33 +161,44 @@ class FaceReconModel(nn.Module):
         )
 
         vertices = torch.cat((vertices, torch.ones(vertices.shape[0], vertices.shape[1], 1).to(self.device)), dim=-1)
-        landmarks = torch.cat((landmarks, torch.ones(landmarks.shape[0], landmarks.shape[1], 1).to(self.device)), dim=-1)
+        landmarks = torch.cat((landmarks, torch.ones(landmarks.shape[0], landmarks.shape[1], 1).to(self.device)),
+                              dim=-1)
 
         vertices_cam = torch.matmul(vertices, world_to_cam)
         landmarks_cam = torch.matmul(landmarks, world_to_cam)
         return vertices_cam, landmarks_cam
 
     def _project_to_ndc_space(
-        self,
-        vertices_cam: torch.Tensor,
-        landmarks_cam: torch.Tensor,
-        cam_to_ndc: torch.Tensor
+            self,
+            vertices_cam: torch.Tensor,
+            landmarks_cam: torch.Tensor,
+            cam_to_ndc: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         vertices_ndc = torch.matmul(vertices_cam, cam_to_ndc).contiguous()
         landmarks_ndc = torch.matmul(landmarks_cam, cam_to_ndc).contiguous()
         return vertices_ndc, landmarks_ndc
 
+    def _project_to_image_space(
+            self,
+            landmarks_cam: torch.Tensor,
+            resolution: tuple[int, int]
+    ) -> torch.Tensor:
+        landmarks_cam = landmarks_cam[:, :, :2]
+        landmarks_cam[:, :, 0] = (landmarks_cam[:, :, 0] + 1) * resolution[1] * 0.5
+        landmarks_cam[:, :, 1] = (1 - landmarks_cam[:, :, 1]) * resolution[0] * 0.5
+        return landmarks_cam
+
     def _render(
-        self,
-        verts_cam: torch.Tensor,
-        verts_ndc: torch.Tensor,
-        albedos: torch.Tensor,
-        resolution: Tuple[int, int]
+            self,
+            verts_cam: torch.Tensor,
+            verts_ndc: torch.Tensor,
+            albedos: torch.Tensor,
+            resolution: Tuple[int, int]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         rast_out, _ = dr.rasterize(self.glctx, verts_ndc, self.face_faces, resolution=resolution)
         texc, _ = dr.interpolate(self.uvcoords, rast_out, self.face_uvfaces)
-        color = dr.texture(albedos, 1-texc, filter_mode='linear')
+        color = dr.texture(albedos, 1 - texc, filter_mode='linear')
         color = color * torch.clamp(rast_out[..., -1:], 0, 1)
         color = color.permute(0, 3, 1, 2)
 
@@ -192,22 +208,69 @@ class FaceReconModel(nn.Module):
         return color, depth
 
     def optimize(
-        self,
-        frame_features: dict
+            self,
+            frame_features: dict
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        color, depth = torch.Tensor(), torch.Tensor()
 
-        # Get vertices in cam space and compute vertices attributes
-        vertices_cam, landmarks_cam = self._project_to_cam_space(self.world_to_cam)
-        albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
+        for resolution, lr, opt_steps, cam2ndc in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs,
+                                                      self.coarse2fine_opt_steps, self.cam_to_ndc):
+            inputs = torch.concatenate([frame_features["image"], frame_features["depth"], frame_features["normal"],
+                                        frame_features["pixel_mask"]], dim=1)
+            inputs_resized = F.interpolate(inputs, size=resolution).to(self.device)
 
-        for resolution, lr, opt_steps, cam2ndc in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs, self.coarse2fine_opt_steps, self.cam_to_ndc):
-            vertices_ndc, landmarks_ndc = self._project_to_ndc_space(vertices_cam, landmarks_cam, cam2ndc)
-            color, depth = self._render(vertices_cam, vertices_ndc, albedos, resolution)
+            input_color = inputs_resized[:, :3].reshape(inputs_resized.shape[0], -1, 3)
+            input_depth = inputs_resized[:, 3].reshape(inputs_resized.shape[0], -1, 1)
+            input_normal = inputs_resized[:, 4:7].reshape(inputs_resized.shape[0], -1, 3)
+            input_pixel_mask = inputs_resized[:, -1].reshape(inputs_resized.shape[0], -1)
+            input_2d_landmarks = frame_features["predicted_landmark_2d"].to(self.device)
 
-            # Compute losses
-            input_color = frame_features[]
+            # Get depth map with x, y coordinates
+            x_indices, y_indices = np.meshgrid(np.arange(resolution[1]), np.arange(resolution[0]))
+            x_indices = torch.from_numpy(x_indices.flatten()).to(self.device)[None, ...]
+            x_indices = torch.repeat_interleave(x_indices, inputs_resized.shape[0], 0)[..., None]
+            y_indices = torch.from_numpy(y_indices.flatten()).to(self.device)[None, ...]
+            y_indices = torch.repeat_interleave(y_indices, inputs_resized.shape[0], 0)[..., None]
+            input_depth = torch.concatenate([x_indices, y_indices, input_depth], dim=-1)
+
+            # Create optimizer
+            optimizer = torch.optim.Adam(
+                [{'params': [self.shape_coeffs, self.exp_coeffs, self.pose_coeffs, self.tex_coeffs]}],
+                lr=lr,
+            )
+            scheduler = ExponentialLR(optimizer, gamma=0.99)
+
+            for _ in tqdm(range(opt_steps)):
+                # Get vertices in cam space and compute vertices attributes
+                vertices_cam, landmarks_cam = self._project_to_cam_space(self.world_to_cam)
+                landmarks_screen = self._project_to_image_space(landmarks_cam, resolution)
+                albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
+
+                vertices_ndc, landmarks_ndc = self._project_to_ndc_space(vertices_cam, landmarks_cam, cam2ndc)
+                color, depth = self._render(vertices_cam, vertices_ndc, albedos, resolution)
+
+                color = color.reshape(color.shape[0], -1, 3)
+                depth = depth.reshape(depth.shape[0], -1, 1)
+                depth = torch.concatenate([x_indices, y_indices, depth], dim=-1)
+
+                # Compute losses
+                landmarks_mask = torch.ones(landmarks_screen.shape[:2]).to(self.device)
+                rgb_mask = torch.where(depth[:, :, -1] < 0, 1, 0)
+                pixel_mask = rgb_mask * input_pixel_mask
+
+                landmarks_loss = landmark_distance(input_2d_landmarks, landmarks_screen, landmarks_mask)
+                rgb_loss = pixel2pixel_distance(input_color, color, pixel_mask)
+                p2point_loss = pixel2pixel_distance(input_depth, depth, pixel_mask)
+
+                loss = self.land_weight * landmarks_loss + self.rgb_weight * rgb_loss + self.p2point_weight * p2point_loss + \
+                       self.shape_reg_weight * self.shape_coeffs.norm(dim=1, p=2) + self.exp_reg_weight * self.exp_coeffs.norm(dim=1, p=2) + \
+                       self.tex_reg_weight * self.tex_coeffs.norm(dim=1, p=2)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
+
+        color = color.reshape(color.shape[0], 3, *self.coarse2fine_resolutions[-1])
+        depth = depth[:, :, -1].reshape(depth.shape[0], *self.coarse2fine_resolutions[-1])
         return color, depth
-
-
-
-

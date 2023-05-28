@@ -108,7 +108,7 @@ parser.add_argument(
 parser.add_argument(
     '--coarse2fine_lrs',
     type=list,
-    default=[1e-3, 5e-4, 1-4],
+    default=[1e-3, 1e-3, 1e-3],
     help='learning rate associated to every level'
 )
 
