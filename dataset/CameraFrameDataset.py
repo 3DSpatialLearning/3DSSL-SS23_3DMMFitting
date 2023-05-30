@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.distance import cdist
 from torchvision.transforms.transforms import Compose as TransformCompose
 from torch import nn
 import os
@@ -123,7 +124,7 @@ class CameraFrameDataset(Dataset):
         :param landmark_detector: landmark detector
         :param force_precompute: if True, precompute landmarks even if they are already existing
     """
-    def precompute_landmarks(self, landmark_detector: nn.Module, force_precompute: bool = False):
+    def precompute_landmarks(self, landmark_detector: nn.Module, closest_neighbour_distance_threshold: float = 0.05, force_precompute: bool = False):
         if not self.has_predicted_landmarks or force_precompute:
             for (cam, frame) in (pbar := tqdm(self.list_of_cam_frame_pairs)):
                 pbar.set_description(f"Computing landmarks for camera {cam} and frame {frame}")
@@ -146,6 +147,14 @@ class CameraFrameDataset(Dataset):
                 landmark_3d = backproject_points(landmark_2d, depth, camera_intrinsics, camera_extrinsics)
                 # clear low consistency landmarks
                 landmark_3d[landmark_3d[:, 2] == 0] = [np.nan, np.nan, np.nan]
+                # remove outliers
+                dist_mtrx = np.nan_to_num(cdist(landmark_3d, landmark_3d), nan=np.inf) # generate distance matrix where nan values (at least one element was nan during the dist calculation) set to inf
+                np.fill_diagonal(dist_mtrx, np.nan) # set diagonal to nan to not count the distance of an element with itself
+                dist_mtrx[dist_mtrx == 0] = np.nan # do not consider duplicate point distances
+                mins = np.nanmin(dist_mtrx, axis=1) # get the closest neighbor distances
+                condition = lambda p, mn : (np.isnan(p).any() or (mn != np.inf and mn > closest_neighbour_distance_threshold))
+                landmark_3d = [[np.nan, np.nan, np.nan] if condition(p, mn) else p for p, mn in zip(landmark_3d, mins)]
+                    
                 np.save(os.path.join(predicted_landmarks_2d_dir, f"{frame}.npy"), landmark_2d)
                 np.save(os.path.join(predicted_landmarks_3d_dir, f"{frame}.npy"), landmark_3d)
 

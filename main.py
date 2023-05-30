@@ -35,6 +35,7 @@ def main(
 
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print("Selected device:", device)
 
     # data loading
     landmark_detector = DlibLandmarkDetector()
@@ -51,12 +52,13 @@ def main(
     pose = torch.nn.Parameter(torch.zeros(1, config.pose_params).float().to(device))
 
     # fitting
-    for frame, batch_features in enumerate(dataloader):
-        print(f"Processing frame {frame}")
-        if frame >= num_frames_for_shape_fitting:
+    total_frame_count = len(dataloader)
+    for frame_id, batch_features in enumerate(dataloader):   
+        print(f"Processing frame {frame_id}/{total_frame_count}")
+        if frame_id >= num_frames_for_shape_fitting:
             shape.requires_grad = False
         shape, exp, pose = fit_flame_to_batched_frame_features(
-            frame,
+            frame_id,
             flame_model,
             shape,
             exp,
