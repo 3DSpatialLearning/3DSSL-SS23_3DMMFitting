@@ -37,15 +37,15 @@ def fit_flame_to_batched_frame_features(
 
     # get alignment from flame to input with Procrustes and set flame pose parameter
     landmarks_input = frame_batch['predicted_landmark_3d'].squeeze().cpu().detach().numpy()
-    not_nan_indices = ~(np.isnan(landmarks_input).any(axis=1))
-    landmarks_flame = landmarks_flame.squeeze().cpu().detach().numpy()[not_nan_indices].transpose()
-    landmarks_input = landmarks_input[not_nan_indices].transpose()
-    r, t = rigid_transform_3d(landmarks_flame, landmarks_input)
+    landmarks_not_nan_indices = ~(np.isnan(landmarks_input).any(axis=1))
+    landmarks_input = landmarks_input[landmarks_not_nan_indices]
+    landmarks_flame = landmarks_flame.squeeze().cpu().detach().numpy()[landmarks_not_nan_indices].transpose()
+    landmarks_input_transposed = landmarks_input.transpose()
+    r, t = rigid_transform_3d(landmarks_flame, landmarks_input_transposed)
     pose.requires_grad = False
     pose[0, :3] = torch.tensor(rotation_matrix_to_axis_angle(r)).to(device)
     pose[0, 3:] = torch.tensor(t.squeeze()).to(device)
     pose.requires_grad = True
-
     # optimize flame shape and expression
     frame_batch = to_device(frame_batch, device)
     optimizer = torch.optim.Adam(
@@ -64,7 +64,7 @@ def fit_flame_to_batched_frame_features(
         random_indices = random.sample(list(range(frame_batch['point'].shape[1])), num_samples)
         scan_to_mesh_loss, _ = scan_to_mesh_distance(frame_batch['point'][:, random_indices], frame_batch['point_normal'][:, random_indices],
                                                  *sample_points_from_meshes(mesh, num_samples=num_samples, return_normals=True))
-        landmark_loss = landmark_dist(frame_batch['predicted_landmark_3d'][:, not_nan_indices], predicted_landmarks[:, not_nan_indices])
+        landmark_loss = landmark_dist(frame_batch['predicted_landmark_3d'][:, landmarks_not_nan_indices], predicted_landmarks[:, landmarks_not_nan_indices])
         loss = config.scan_to_mesh_weight * scan_to_mesh_loss + config.landmark_weight * landmark_loss + \
                config.shape_regularization_weight * shape.norm(dim=1, p=2) + config.exp_regularization_weight * exp.norm(dim=1, p=2)
         loss.backward()
@@ -76,8 +76,9 @@ def fit_flame_to_batched_frame_features(
         points_scan=frame_batch['point'].squeeze().cpu().numpy(),
         points_3d_face=predicted_vertices.detach().cpu().squeeze().numpy(),
         faces_3d_face=flame_model.faces,
+        predicted_landmarks_3d=landmarks_input,
         screenshot=False,
-        screenshot_path=f"{frame_id}.png"
+        screenshot_path=f"{frame_id}.png",
     )
 
     return (shape, exp, pose)

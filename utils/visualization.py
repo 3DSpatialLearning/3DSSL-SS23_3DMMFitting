@@ -26,20 +26,24 @@ def visualize_3d_face_model(points: np.ndarray, faces: np.ndarray, screenshot: b
 def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
                                         points_3d_face: np.ndarray,
                                         faces_3d_face: np.ndarray,
+                                        predicted_landmarks_3d: np.ndarray = None,
                                         screenshot: bool = False,
                                         screenshot_path: str = None):
-
     pv_scan_points = pv.PolyData(points_scan)
     pv_3d_mesh = pv.PolyData(points_3d_face,
                              np.concatenate((np.ones((faces_3d_face.shape[0], 1)) * 3,
                                              faces_3d_face), axis=-1).reshape(-1).astype(np.int64))
+    pv_predicted_landmarks_3d = predicted_landmarks_3d
+
     if screenshot:
         plotter = pv.Plotter(shape=(1, 3), off_screen=True)
+        plotter.set_background('white')
     else:
         plotter = pv.Plotter(shape=(1, 3))
 
     plotter.subplot(0, 0)
-    plotter.add_mesh(pv_scan_points, color='red', point_size=1)
+    plotter.add_mesh(pv_scan_points, color='red', opacity=0.2, point_size=1)
+    plotter.add_mesh(pv_predicted_landmarks_3d, color='blue', point_size=7, style='points')
     plotter.add_text("Face Scan")
     plotter.add_axes(line_width=5, labels_off=False)
 
