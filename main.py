@@ -30,6 +30,8 @@ from models.FaceReconstructionModel import FaceReconModel
   - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
 """
 
+torch.backends.cudnn.benchmark = True
+
 
 def main(
         cam_data_dir: str = "data/toy_task/multi_frame_rgbd_fitting",
@@ -67,7 +69,7 @@ def main(
     )
 
     # compute the initial alignment
-    gt_landmark = first_frame_features["predicted_landmark_3d"][0]
+    gt_landmark = first_frame_features["predicted_landmark_2d"][0]
     face_recon_model.set_initial_pose(gt_landmark)
 
     for frame_num, frame_features in enumerate(dataloader):

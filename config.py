@@ -108,14 +108,14 @@ parser.add_argument(
 parser.add_argument(
     '--coarse2fine_lrs',
     type=list,
-    default=[1e-3, 1e-3, 1e-3],
+    default=[5e-3, 1e-3, 5e-4],
     help='learning rate associated to every level'
 )
 
 parser.add_argument(
     '--coarse2fine_opt_steps',
     type=list,
-    default=[10, 20, 30],
+    default=[100, 50, 50],
     help='number of optimization steps associated to every level'
 )
 
@@ -129,49 +129,49 @@ parser.add_argument(
 parser.add_argument(
     '--landmark_weight',
     type=float,
-    default=1e-2,
+    default=0.125,
     help='Landmark term weight'
 )
 
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=1e-8,
+    default=0.025,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=1e-9,
+    default=0.025,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=1e-9,
+    default=0.025,
     help='Texture regularization weight'
 )
 
 parser.add_argument(
     '--rgb_weight',
     type=float,
-    default=1e-2,
+    default=20,
     help='color loss weight'
 )
 
 parser.add_argument(
     '--point2point_weight',
     type=float,
-    default=1e-3,
+    default=2,
     help='point to point loss weight'
 )
 
 parser.add_argument(
     '--point2plane_weight',
     type=float,
-    default=1e-3,
+    default=10,
     help='point to plane loss weight'
 )
 

@@ -174,29 +174,30 @@ def landmark_distance(
     :return: Tensor giving the reduced l2 distance between the source
     and destination landmarks
     """
-
     landmarks_distance = (source_landmarks - dest_landmarks).pow(2).sum(2)
     landmarks_distance = landmarks_distance * landmarks_mask
-    landmarks_distance = landmarks_distance.sum() / source_landmarks.shape[0]
+    landmarks_distance = torch.mean(landmarks_distance)
     return landmarks_distance
 
 
 def pixel2pixel_distance(
     source_pixels: torch.Tensor,
     dest_pixels: torch.Tensor,
-    pixels_mask: torch.Tensor
+    pixels_mask: torch.Tensor,
+    num_valid_pixels: torch.Tensor,
 ) -> torch.Tensor:
     """
 
     :param source_pixels: FloatTensor of shape (B, num_pixels, D)
     :param dest_pixels: FloatTensor of shape (B, num_pixels, D)
     :param pixels_mask: FloatTensor of shape (B, num_pixels)
+    :param num_valid_pixels: FloatTensor indicating how many pixels were visible
     :return: Tensor giving the reduced pixel to pixel distance computed
     as the reduced L2 distance between the pixel values
     """
     p2p_distance = (source_pixels - dest_pixels).pow(2).sum(2)
     p2p_distance = p2p_distance * pixels_mask
-    p2p_distance = p2p_distance.sum() / p2p_distance.shape[0]
+    p2p_distance = torch.mean(p2p_distance.sum(-1) / num_valid_pixels)
 
     return p2p_distance
 
@@ -206,7 +207,8 @@ def point2plane_distance(
     source_normals: torch.Tensor,
     dest_points: torch.Tensor,
     dest_normals: torch.Tensor,
-    pixels_mask: torch.Tensor
+    pixels_mask: torch.Tensor,
+    num_valid_pixels: torch.Tensor
 ) -> torch.Tensor:
     """
 
@@ -215,6 +217,7 @@ def point2plane_distance(
     :param dest_points: FloatTensor of shape (B, num_pixels, D)
     :param dest_normals: FloatTensor of shape (B, num_pixels, D)
     :param pixels_mask: FloatTensor of shape (B, num_pixels)
+    :param num_valid_pixels: FloatTensor indicating how many pixels were visible
     :return: Tensor giving the reduced bidirectional point to plane
     distance computed from source_point to gt_point and gt_point to
     source_point
@@ -223,7 +226,7 @@ def point2plane_distance(
     d2s_distance = ((dest_points - source_points) * source_normals).sum(2).pow(2)
     p2plane_distance = s2d_distance + d2s_distance
     p2plane_distance *= pixels_mask
-    p2plane_distance = p2plane_distance.sum() / p2plane_distance.shape[0]
+    p2plane_distance = p2plane_distance.sum() / num_valid_pixels
 
     return p2plane_distance
 
