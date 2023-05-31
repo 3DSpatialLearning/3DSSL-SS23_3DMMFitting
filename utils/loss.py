@@ -1,7 +1,14 @@
 from pytorch3d.loss.chamfer import *
 from pytorch3d.loss.chamfer import _handle_pointcloud_input
 from pytorch3d.loss.chamfer import _validate_chamfer_reduction_inputs
+from pytorch3d.loss import point_mesh_face_distance
+from pytorch3d.structures import Meshes, Pointclouds
 
+
+def scan_to_mesh_face_distance(scan_points: torch.tensor, mesh: Meshes):
+    pcd = Pointclouds(points=[scan_points[0]])
+    loss = point_mesh_face_distance(mesh, pcd)
+    return loss
 
 # Custom chamfer distance:
 def scan_to_mesh_distance(scans_points,

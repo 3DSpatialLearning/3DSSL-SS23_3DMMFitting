@@ -90,8 +90,15 @@ parser.add_argument(
 parser.add_argument(
     '--scan_to_mesh_weight',
     type=float,
-    default=2.0,
+    default=1.0,
     help='Scan to mesh term weight'
+)
+
+parser.add_argument(
+    '--scan_to_face_weight',
+    type=float,
+    default=1e-2,
+    help='Scan to face term weight'
 )
 
 parser.add_argument(

@@ -11,11 +11,10 @@ from pytorch3d.ops import sample_points_from_meshes
 from torch.utils.tensorboard import SummaryWriter
 from flame.FLAME import FLAME
 from utils.transform import rigid_transform_3d
-from utils.loss import scan_to_mesh_distance
+from utils.loss import scan_to_mesh_distance, scan_to_mesh_face_distance
 from utils.transform import rotation_matrix_to_axis_angle
 from utils.visualization import visualize_3d_scan_and_3d_face_model
 from dataset.utils import to_device
-from utils.visualization import visualize_3d_face_model
 
 def fit_flame_to_batched_frame_features(
         frame_id: int,
@@ -62,10 +61,13 @@ def fit_flame_to_batched_frame_features(
                                                               pose_params=pose)
         mesh = Meshes(verts=predicted_vertices, faces=flame_model_faces)
         random_indices = random.sample(list(range(frame_batch['point'].shape[1])), num_samples)
-        scan_to_mesh_loss, _ = scan_to_mesh_distance(frame_batch['point'][:, random_indices], frame_batch['point_normal'][:, random_indices],
+        random_points = frame_batch['point'][:, random_indices]
+        random_normals = frame_batch['point_normal'][:, random_indices]
+        scan_to_mesh_loss, _ = scan_to_mesh_distance(random_points, random_normals,
                                                  *sample_points_from_meshes(mesh, num_samples=num_samples, return_normals=True))
+        scan_to_face_loss = scan_to_mesh_face_distance(random_points, mesh)
         landmark_loss = landmark_dist(frame_batch['predicted_landmark_3d'][:, landmarks_not_nan_indices], predicted_landmarks[:, landmarks_not_nan_indices])
-        loss = config.scan_to_mesh_weight * scan_to_mesh_loss + config.landmark_weight * landmark_loss + \
+        loss = config.scan_to_mesh_weight * scan_to_mesh_loss + config.scan_to_face_weight * scan_to_face_loss + config.landmark_weight * landmark_loss + \
                config.shape_regularization_weight * shape.norm(dim=1, p=2) + config.exp_regularization_weight * exp.norm(dim=1, p=2)
         loss.backward()
         optimizer.step()
