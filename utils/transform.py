@@ -24,7 +24,7 @@ def intrinsics_to_projection(intrinsics: np.ndarray, znear: float =.1, zfar: flo
                                   [0, 0, -1, 0]])
     return projection_matrix
 
-def filter_outliers_landmarks(landmark: np.ndarray, threshold: float = 0.0) -> np.ndarray:
+def filter_outliers_landmarks(landmark: np.ndarray, threshold: float = 1.0) -> np.ndarray:
     """
     Filters out the outliers from the landmarks by setting corresponding outlier positions to nan.
     :param landmark: Nx3

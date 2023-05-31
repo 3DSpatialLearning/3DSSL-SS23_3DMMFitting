@@ -97,10 +97,9 @@ class CameraFrameDataset(Dataset):
         features["projection_matrix"] = intrinsics_to_projection(features["intrinsics"]).astype(np.float32)
         features["extrinsics"] = np.load(os.path.join(path, self.extrinsics_filename))
         if self.has_gt_landmarks:
-            features["gt_landmark"] = np.load(os.path.join(path, self.gt_landmarks_subdir, f"{frame_id}.npy"))
-            features["gt_landmark"] = filter_outliers_landmarks(features["gt_landmark"], 0.03)
+            features["gt_landmark"] = np.load(os.path.join(path, self.gt_landmarks_subdir, f"{frame_id}.npy")).astype(np.float32)
         if self.has_predicted_landmarks:
-            features["predicted_landmark_2d"] = np.load(os.path.join(path, self.predicted_2d_landmarks_subdir, f"{frame_id}.npy"))
+            features["predicted_landmark_2d"] = np.load(os.path.join(path, self.predicted_2d_landmarks_subdir, f"{frame_id}.npy")).astype(np.float32)
             features["predicted_landmark_3d"] = np.load(os.path.join(path, self.predicted_3d_landmarks_subdir, f"{frame_id}.npy"))
             features["predicted_landmark_3d"] = filter_outliers_landmarks(features["predicted_landmark_3d"], 0.03).astype(np.float32)
 
@@ -138,7 +137,7 @@ class CameraFrameDataset(Dataset):
                     os.makedirs(predicted_landmarks_3d_dir)
                 # predict landmarks pixel coordinates
                 landmark_2d = landmark_detector(image)
-                # backproject to 3d landmarks
+                # back-project to 3d landmarks
                 depth = np.load(os.path.join(path_to_cam_folder, self.depth_subdir, f"{frame}.npy"))
                 consistency = np.load(os.path.join(path_to_cam_folder, self.consistency_subdir, f"{frame}.npy"))
                 depth[consistency < self.consistency_threshold] = 0

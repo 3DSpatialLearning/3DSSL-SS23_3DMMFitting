@@ -2,40 +2,38 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from dataset.CameraFrameDataset import CameraFrameDataset
-from dataset.utils import dict_tensor_to_np
-from utils.transform import backproject_points
-from models.LandmarkDetector import DlibLandmarkDetector
 import os
 import cv2
 import pyvista as pv
 
+from dataset.CameraFrameDataset import CameraFrameDataset
+from dataset.utils import dict_tensor_to_np
+from models.LandmarkDetector import DlibLandmarkDetector
+from config import get_config
+
 main_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(str(main_dir))
 
-DATA_DIR = "../data/toy_task/multi_frame_rgbd_fitting"
-DLIB_DETECTOR_PATH = "../data/checkpoints/mmod_human_face_detector.dat"
-DLIB_PREDICTOR_PATH = "../data/checkpoints/shape_predictor_68_face_landmarks.dat"
-
-VISUALIZE_2D = False
-VISUALIZE_LANDMARKS_3D = False
+VISUALIZE_2D = True
+VISUALIZE_LANDMARKS_3D = True
 
 if __name__ == '__main__':
     print("Loading camera sequence data...")
-    dataset = CameraFrameDataset(path_to_cam_dir=DATA_DIR, has_gt_landmarks=True)
+    config = get_config(path_to_data_dir="../")
+    dataset = CameraFrameDataset(path_to_data=config.cam_data_dir, has_gt_landmarks=True)
+    print("Loading landmark detector...")
+    landmark_detector = DlibLandmarkDetector(path_to_dlib_predictor_model=config.dlib_face_predictor_path)
+    dataset.precompute_landmarks(landmark_detector, force_precompute=True)
     data_loader = DataLoader(
         dataset=dataset,
         pin_memory=True,
         batch_size=1,
     )
-    print("Loading landmark detector...")
-    landmark_detector = DlibLandmarkDetector(path_to_dlib_predictor_model=DLIB_PREDICTOR_PATH)
-    print("Calculating landmarks...")
     for id, frame in enumerate(data_loader):
         frame = dict_tensor_to_np(frame)
-        image = frame['image'].squeeeze()
-        landmarks_2d = landmark_detector(image)
+        image = frame['image'].squeeze()
         if VISUALIZE_2D:
+            landmarks_2d = frame['predicted_landmark_2d'].squeeze()
             cv2.namedWindow(f"image {id}", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty(f"image {id}", int(image.shape[0] * 0.75), int(image.shape[1] * 0.75))
             for i, uv in enumerate(landmarks_2d):
@@ -43,12 +41,11 @@ if __name__ == '__main__':
                             fontScale=1, color=(0, 0, 255), thickness=2)
             cv2.imshow(f"image {id}", image)
             cv2.waitKey(0)
-            cv2.destroyWindow(f"image {id}")
-
-        gt_landmarks = frame['gt_landmark'].squeeeze()
-        estimated_landmarks = backproject_points(landmarks_2d, frame['depth'].squeeeze(), frame['intrinsics'].squeeeze(), frame['extrinsics'].squeeeze())
+            # cv2.destroyWindow(f"image {id}")
 
         if VISUALIZE_LANDMARKS_3D:
+            gt_landmarks = frame['gt_landmark'].squeeze()
+            estimated_landmarks = frame['predicted_landmark_3d'].squeeze()
             not_nan_indices = ~(np.isnan(gt_landmarks).any(axis=1))
             criterion = nn.MSELoss(reduction='mean')
             error = criterion(torch.from_numpy(estimated_landmarks[not_nan_indices]),

@@ -1,4 +1,5 @@
 import argparse
+import torch
 
 parser = argparse.ArgumentParser(description='FLAME fitting config')
 
@@ -71,7 +72,30 @@ parser.add_argument(
     help='Training batch size.'
 )
 
-####################### Other args #######################
+####################### General  #######################
+
+parser.add_argument(
+    '--cam_data_dir',
+    type=str,
+    default="data/toy_task/multi_frame_rgbd_fitting",
+    help='Directory containing the camera data'
+)
+
+parser.add_argument(
+    '--device',
+    type=str,
+    default=None,
+    help='Device to run the operations'
+)
+
+parser.add_argument(
+    '--dlib_face_predictor_path',
+    type=str,
+    default="data/checkpoints/shape_predictor_68_face_landmarks.dat",
+    help='Path to dlib face predictor checkpoint'
+)
+
+####################### Fitting #######################
 
 parser.add_argument(
     '--steps',
@@ -122,11 +146,22 @@ parser.add_argument(
     help='Expression regularization weight'
 )
 
+parser.add_argument(
+    '--num_frames_for_shape_fitting',
+    type=int,
+    default=3,
+    help='Number of frames to use for shape fitting'
+)
+
 def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
     config = parser.parse_args()
     config.flame_model_path = path_to_data_dir + config.flame_model_path
     config.static_landmark_embedding_path = path_to_data_dir + config.static_landmark_embedding_path
     config.dynamic_landmark_embedding_path = path_to_data_dir + config.dynamic_landmark_embedding_path
+    config.cam_data_dir = path_to_data_dir + config.cam_data_dir
+    config.dlib_face_predictor_path = path_to_data_dir + config.dlib_face_predictor_path
     assert config.shape_params > 0 and config.shape_params <= 300, "Shape params should be between 1 and 300"
     assert config.expression_params > 0 and config.expression_params <= 100, "Shape params should be between 1 and 100"
+    if config.device is None:
+        config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     return config
