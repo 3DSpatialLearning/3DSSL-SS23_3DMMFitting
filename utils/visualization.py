@@ -27,7 +27,6 @@ def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
                                         points_3d_face: np.ndarray,
                                         faces_3d_face: np.ndarray,
                                         predicted_landmarks_3d: np.ndarray = None,
-                                        screenshot: bool = False,
                                         screenshot_path: str = None):
     pv_scan_points = pv.PolyData(points_scan)
     pv_3d_mesh = pv.PolyData(points_3d_face,
@@ -35,7 +34,7 @@ def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
                                              faces_3d_face), axis=-1).reshape(-1).astype(np.int64))
     pv_predicted_landmarks_3d = predicted_landmarks_3d
 
-    if screenshot:
+    if screenshot_path is not None:
         plotter = pv.Plotter(shape=(1, 3), off_screen=True)
         plotter.set_background('white')
     else:
@@ -61,7 +60,7 @@ def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
     plotter.link_views()
     plotter.camera_position = 'xy'
 
-    if screenshot:
+    if screenshot_path is not None:
         plotter.screenshot(screenshot_path)
     else:
         plotter.show()

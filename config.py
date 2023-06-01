@@ -98,6 +98,14 @@ parser.add_argument(
 ####################### Fitting #######################
 
 parser.add_argument(
+    '--num_samples',
+    type=int,
+    default=10000,
+    help='Num of points to sample from Flame mesh'
+)
+
+
+parser.add_argument(
     '--steps',
     type=int,
     default=200,
@@ -135,19 +143,19 @@ parser.add_argument(
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=1e-8,
+    default=1e-3,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=1e-9,
+    default=1e-3,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
-    '--num_frames_for_shape_fitting',
+    '--shape_fitting_frames',
     type=int,
     default=3,
     help='Number of frames to use for shape fitting'

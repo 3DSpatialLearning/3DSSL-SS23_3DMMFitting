@@ -107,7 +107,7 @@ class CameraFrameDataset(Dataset):
         features["depth"][features["consistency"] < self.consistency_threshold] = 0
         features["normal"][features["consistency"] < self.consistency_threshold] = [0, 0, 0]
 
-        # backproject points and get their normals (could be removed later when loss is computed on image space)
+        # back-project points and get their normals (could be removed later when loss is computed on image space)
         if self.need_backprojection:
             point_coords = get_coordinates_from_depth_map_by_threshold(features["depth"])
             features["point"] = backproject_points(point_coords, features["depth"], features["intrinsics"], features["extrinsics"]).astype(np.float32)

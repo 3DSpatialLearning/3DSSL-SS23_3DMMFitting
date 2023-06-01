@@ -41,22 +41,19 @@ def fit_flame_to_batched_frame_features(
     landmarks_input_transposed = landmarks_input.transpose()
     r, t = rigid_transform_3d(landmarks_flame, landmarks_input_transposed)
     pose.requires_grad = False
-    pose[0, :3] = torch.tensor(rotation_matrix_to_axis_angle(r)).to(config.device)
-    pose[0, 3:] = torch.tensor(t.squeeze()).to(config.device)
+    pose[0, :3] = torch.from_numpy(rotation_matrix_to_axis_angle(r)).to(config.device)
+    pose.requires_grad = True
+    transl = torch.from_numpy(t.T).to(config.device)
 
     predicted_vertices, predicted_landmarks = flame_model(shape_params=shape, expression_params=exp,
-                                                          pose_params=pose)
+                                                          pose_params=pose, transl=transl)
     visualize_3d_scan_and_3d_face_model(
         points_scan=frame_batch['point'].squeeze().cpu().numpy(),
         points_3d_face=predicted_vertices.detach().cpu().squeeze().numpy(),
         faces_3d_face=flame_model.faces,
         predicted_landmarks_3d=landmarks_input,
-        screenshot=False,
-        screenshot_path=f"{frame_id}.png",
     )
 
-
-    pose.requires_grad = True
     # optimize flame shape and expression
     frame_batch = to_device(frame_batch, config.device)
     optimizer = torch.optim.Adam(
@@ -65,18 +62,17 @@ def fit_flame_to_batched_frame_features(
     )
     scheduler = ExponentialLR(optimizer, gamma=0.999)
     landmark_dist = nn.MSELoss()
-    num_samples = 20000
     pbar = tqdm(range(config.steps))
     for _ in pbar:
         optimizer.zero_grad()
         predicted_vertices, predicted_landmarks = flame_model(shape_params=shape, expression_params=exp,
-                                                              pose_params=pose)
+                                                              pose_params=pose, transl=transl)
         mesh = Meshes(verts=predicted_vertices, faces=flame_model_faces)
-        random_indices = random.sample(list(range(frame_batch['point'].shape[1])), num_samples)
+        random_indices = random.sample(list(range(frame_batch['point'].shape[1])), config.num_samples)
         random_points = frame_batch['point'][:, random_indices]
         random_normals = frame_batch['point_normal'][:, random_indices]
         scan_to_mesh_loss, _ = scan_to_mesh_distance(random_points, random_normals,
-                                                 *sample_points_from_meshes(mesh, num_samples=num_samples, return_normals=True))
+                                                 *sample_points_from_meshes(mesh, num_samples=config.num_samples, return_normals=True))
         scan_to_face_loss = scan_to_mesh_face_distance(random_points, mesh)
         landmark_loss = landmark_dist(frame_batch['gt_landmark'][:, landmarks_not_nan_indices], predicted_landmarks[:, landmarks_not_nan_indices])
         loss = config.scan_to_mesh_weight * scan_to_mesh_loss + config.scan_to_face_weight * scan_to_face_loss + config.landmark_weight * landmark_loss + \
@@ -91,11 +87,10 @@ def fit_flame_to_batched_frame_features(
         points_3d_face=predicted_vertices.detach().cpu().squeeze().numpy(),
         faces_3d_face=flame_model.faces,
         predicted_landmarks_3d=landmarks_input,
-        screenshot=False,
         screenshot_path=f"{frame_id}.png",
     )
 
-    return (shape, exp, pose)
+    return shape, exp, pose
 
 
 """

@@ -49,7 +49,11 @@ if __name__ == '__main__':
     total_frame_count = len(dataloader)
     for frame_id, batch_features in enumerate(dataloader):
         print(f"Processing frame {frame_id}/{total_frame_count}")
-        if frame_id >= config.num_frames_for_shape_fitting:
+        if frame_id == 0:
+            exp.requires_grad = False
+        else:
+            exp.requires_grad = True
+        if frame_id >= config.shape_fitting_frames:
             shape.requires_grad = False
         shape, exp, pose = fit_flame_to_batched_frame_features(
             frame_id,
