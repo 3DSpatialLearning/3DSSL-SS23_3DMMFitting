@@ -115,7 +115,7 @@ parser.add_argument(
 parser.add_argument(
     '--coarse2fine_opt_steps',
     type=list,
-    default=[100, 50, 50],
+    default=[300, 200, 100],
     help='number of optimization steps associated to every level'
 )
 

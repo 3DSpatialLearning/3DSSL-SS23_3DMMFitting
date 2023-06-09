@@ -1,6 +1,5 @@
 import fire
 import torch
-import numpy as np
 import cv2
 
 from torch.utils.data import DataLoader
@@ -69,7 +68,7 @@ def main(
     )
 
     # compute the initial alignment
-    gt_landmark = first_frame_features["predicted_landmark_2d"][0]
+    gt_landmark = first_frame_features["predicted_landmark_3d"][0]
     face_recon_model.set_initial_pose(gt_landmark)
 
     for frame_num, frame_features in enumerate(dataloader):

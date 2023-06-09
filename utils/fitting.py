@@ -17,15 +17,16 @@ from utils.visualization import visualize_3d_scan_and_3d_face_model
 from dataset.utils import to_device
 from utils.visualization import visualize_3d_face_model
 
+
 def fit_flame_to_batched_frame_features(
-        frame_id: int,
-        flame_model: FLAME,
-        shape: nn.Parameter,
-        exp: nn.Parameter,
-        pose: nn.Parameter,
-        frame_batch: dict[str, torch.tensor],
-        device: str,
-        config: argparse.Namespace
+    frame_id: int,
+    flame_model: FLAME,
+    shape: nn.Parameter,
+    exp: nn.Parameter,
+    pose: nn.Parameter,
+    frame_batch: dict[str, torch.tensor],
+    device: str,
+    config: argparse.Namespace
 ):
     flame_model = flame_model.to(device)
     flame_model_faces = torch.from_numpy(flame_model.faces.astype(np.int32)).unsqueeze(0).to(device)
@@ -86,10 +87,12 @@ def fit_flame_to_batched_frame_features(
 """
     Deprecated: only used in the toy task
 """
+
+
 def fit_flame_model_to_input_point_cloud(
-        input_data: dict[str, np.ndarray],
-        config: argparse.Namespace,
-        display_results: bool = True,
+    input_data: dict[str, np.ndarray],
+    config: argparse.Namespace,
+    display_results: bool = True,
 ):
     writer = SummaryWriter()
 
