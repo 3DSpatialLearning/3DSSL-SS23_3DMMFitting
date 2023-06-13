@@ -72,10 +72,15 @@ def main(
     face_recon_model.set_initial_pose(gt_landmark)
 
     for frame_num, frame_features in enumerate(dataloader):
-        color, depth = face_recon_model.optimize(frame_features)
-        depth = depth[0].detach().cpu().numpy()
+        color, depth, input_color, input_depth = face_recon_model.optimize(frame_features)
         color = color[0].detach().cpu().numpy()
-        cv2.imshow("img", color.transpose(1, 2, 0)[:,:,::-1])
+        depth = depth[0].detach().cpu().numpy()
+        input_color = input_color[0].detach().cpu().numpy()
+        input_depth = input_depth[0].detach().cpu().numpy()
+
+        alpha = 0.6
+        blended = cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)
+        cv2.imshow("blended", blended[:,:,::-1])
         cv2.waitKey(0)
         break
 

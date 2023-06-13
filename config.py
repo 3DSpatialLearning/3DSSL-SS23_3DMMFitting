@@ -108,7 +108,7 @@ parser.add_argument(
 parser.add_argument(
     '--coarse2fine_lrs',
     type=list,
-    default=[5e-3, 1e-3, 5e-4],
+    default=[1e-2, 5e-3, 1e-3],
     help='learning rate associated to every level'
 )
 
@@ -150,7 +150,7 @@ parser.add_argument(
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.0025,
     help='Texture regularization weight'
 )
 
