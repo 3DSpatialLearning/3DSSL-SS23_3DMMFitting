@@ -1,4 +1,5 @@
 import argparse
+import torch
 
 parser = argparse.ArgumentParser(description='FLAME fitting config')
 
@@ -96,7 +97,37 @@ parser.add_argument(
     help='Training batch size.'
 )
 
-####################### Optimization related args #######################
+####################### General  #######################
+
+parser.add_argument(
+    '--cam_data_dir',
+    type=str,
+    default="data/toy_task/multi_frame_rgbd_fitting",
+    help='Directory containing the camera data'
+)
+
+parser.add_argument(
+    '--device',
+    type=str,
+    default=None,
+    help='Device to run the operations'
+)
+
+parser.add_argument(
+    '--dlib_face_predictor_path',
+    type=str,
+    default="data/checkpoints/shape_predictor_68_face_landmarks.dat",
+    help='Path to dlib face predictor checkpoint'
+)
+
+####################### Fitting #######################
+
+parser.add_argument(
+    '--num_samples',
+    type=int,
+    default=10000,
+    help='Num of points to sample from Flame mesh'
+)
 
 parser.add_argument(
     '--coarse2fine_resolutions',
@@ -122,8 +153,15 @@ parser.add_argument(
 parser.add_argument(
     '--scan_to_mesh_weight',
     type=float,
-    default=2.0,
+    default=1.0,
     help='Scan to mesh term weight'
+)
+
+parser.add_argument(
+    '--scan_to_face_weight',
+    type=float,
+    default=1e-2,
+    help='Scan to face term weight'
 )
 
 parser.add_argument(
@@ -175,12 +213,25 @@ parser.add_argument(
     help='point to plane loss weight'
 )
 
+parser.add_argument(
+    '--shape_fitting_frames',
+    type=int,
+    default=3,
+    help='Number of frames to use for shape fitting'
+)
 
-def get_config(path_to_data_dir: str = '') -> argparse.Namespace:
+
+def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
     config = parser.parse_args()
+
+    assert 0 < config.shape_params <= 300, "Shape params should be between 1 and 300"
+    assert 0 < config.expression_params <= 100, "Shape params should be between 1 and 100"
+
     config.flame_model_path = path_to_data_dir + config.flame_model_path
     config.static_landmark_embedding_path = path_to_data_dir + config.static_landmark_embedding_path
     config.dynamic_landmark_embedding_path = path_to_data_dir + config.dynamic_landmark_embedding_path
-    assert 0 < config.shape_params <= 300, "Shape params should be between 1 and 300"
-    assert 0 < config.expression_params <= 100, "Shape params should be between 1 and 100"
+    config.cam_data_dir = path_to_data_dir + config.cam_data_dir
+    config.dlib_face_predictor_path = path_to_data_dir + config.dlib_face_predictor_path
+    if config.device is None:
+        config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     return config
