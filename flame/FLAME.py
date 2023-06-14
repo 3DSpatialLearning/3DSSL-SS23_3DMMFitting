@@ -255,10 +255,24 @@ class FLAMETex(nn.Module):
         super(FLAMETex, self).__init__()
         tex_params = config.tex_params
         tex_space = np.load(config.tex_space_path)
-        texture_mean = tex_space['mean'].reshape(1, -1)
-        texture_basis = tex_space['tex_dir'].reshape(-1, 200)
-        texture_mean = torch.from_numpy(texture_mean).float()[None,...]
-        texture_basis = torch.from_numpy(texture_basis[:,:tex_params]).float()[None,...]
+        # FLAME texture
+        if 'tex_dir' in tex_space.files:
+            mu_key = 'mean'
+            pc_key = 'tex_dir'
+            n_pc = 200
+            scale = 1
+        # BFM to FLAME texture
+        else:
+            mu_key = 'MU'
+            pc_key = 'PC'
+            n_pc = 199
+            scale = 255.0
+
+        texture_mean = tex_space[mu_key].reshape(1, -1)
+        texture_basis = tex_space[pc_key].reshape(-1, n_pc)
+        n_tex = config.tex_params
+        texture_mean = torch.from_numpy(texture_mean).float()[None, ...] * scale
+        texture_basis = torch.from_numpy(texture_basis[:, :n_tex]).float()[None, ...] * scale
         self.register_buffer('texture_mean', texture_mean)
         self.register_buffer('texture_basis', texture_basis)
 

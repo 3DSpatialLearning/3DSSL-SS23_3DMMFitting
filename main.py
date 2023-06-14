@@ -81,6 +81,8 @@ def main(
         alpha = 0.6
         blended = cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)
         cv2.imshow("blended", blended[:,:,::-1])
+        cv2.imshow("original", input_color[:,:,::-1])
+        cv2.imshow("rendered", color[:,:,::-1])
         cv2.waitKey(0)
         break
 

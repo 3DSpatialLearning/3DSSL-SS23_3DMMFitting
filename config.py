@@ -29,7 +29,7 @@ parser.add_argument(
 parser.add_argument(
     '--tex_space_path',
     type=str,
-    default='data/flame_model/FLAME_texture.npz',
+    default='data/flame_model/FLAME_albedo_from_BFM.npz',
     help='Texture space path for FLAME'
 )
 
@@ -72,7 +72,7 @@ parser.add_argument(
 parser.add_argument(
     '--tex_params',
     type=int,
-    default=50,
+    default=100,
     help='the number of expression parameters'
 )
 

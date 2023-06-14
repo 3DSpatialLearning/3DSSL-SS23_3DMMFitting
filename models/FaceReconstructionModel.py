@@ -39,7 +39,8 @@ class FaceReconModel(nn.Module):
         self.exp_coeffs = nn.Parameter(torch.zeros(1, face_model_config.expression_params).float())
         self.pose_coeffs = nn.Parameter(torch.zeros(1, face_model_config.pose_params).float())
         self.tex_coeffs = nn.Parameter(torch.zeros(1, face_model_config.tex_params).float())
-        self.transl_coeffs = nn.Parameter(torch.zeros(1, 3).float())
+        self.transl_coeffs = nn.Parameter(torch.zeros(1, 3).float().contiguous())
+        self.albedo = nn.Parameter(torch.zeros(1, 256, 256, 3).float())
 
         # Render-related settings
         self.glctx = dr.RasterizeCudaContext(device=device)
@@ -61,7 +62,7 @@ class FaceReconModel(nn.Module):
             faces = self.faces.cpu()
             uvfaces = self.uvfaces.cpu()
 
-            face_verts = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"], masks["neck"]])
+            face_verts = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"]])
             face_faces = []
             face_uvfaces = []
 
@@ -146,32 +147,68 @@ class FaceReconModel(nn.Module):
             intrinsics = torch.stack(intrinsics).to(self.device)
             self.intrinsics.append(intrinsics)
 
+    # def set_initial_pose(
+    #     self,
+    #     input_landmarks: torch.Tensor
+    # ):
+    #     _, landmarks = self.face_model(
+    #         shape_params=self.shape_coeffs,
+    #         expression_params=self.exp_coeffs,
+    #         pose_params=self.pose_coeffs
+    #     )
+    #
+    #     input_landmarks = input_landmarks.cpu().numpy()[17:, :]
+    #     landmarks = landmarks[0].detach().cpu().numpy()[17:, :]
+    #
+    #     not_nan_indices = ~(np.isnan(input_landmarks).any(axis=1))
+    #     input_landmarks = input_landmarks[not_nan_indices]
+    #     landmarks = landmarks[not_nan_indices]
+    #
+    #     r, t = rigid_transform_3d(input_landmarks.T, landmarks.T)
+    #     r = rotation_matrix_to_axis_angle(r)
+    #
+    #     self.pose_coeffs = nn.Parameter(
+    #         torch.from_numpy(np.concatenate([r, np.zeros(3)])[None, ...]).float().to(self.device))
+    #
+    #     self.transl_coeffs = nn.Parameter(
+    #         torch.from_numpy(t).t().float().to(self.device)
+    #     )
+
     def set_initial_pose(
-        self,
-        input_landmarks: torch.Tensor
+            self,
+            input_landmarks: torch.Tensor
     ):
-        _, landmarks = self.face_model(
-            shape_params=self.shape_coeffs,
-            expression_params=self.exp_coeffs,
-            pose_params=self.pose_coeffs
-        )
+        input_landmarks = input_landmarks[None, ...].float().to(self.device)
+        input_landmarks = input_landmarks[:, 17:]
 
-        input_landmarks = input_landmarks.cpu().numpy()[17:, :]
-        landmarks = landmarks[0].detach().cpu().numpy()[17:, :]
-
-        not_nan_indices = ~(np.isnan(input_landmarks).any(axis=1))
+        not_nan_indices = ~(torch.isnan(input_landmarks).any(dim=-1))
         input_landmarks = input_landmarks[not_nan_indices]
-        landmarks = landmarks[not_nan_indices]
 
-        r, t = rigid_transform_3d(input_landmarks.T, landmarks.T)
-        r = rotation_matrix_to_axis_angle(r)
+        for resolution, lr, opt_steps, cam2ndc in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs,
+                                                      self.coarse2fine_opt_steps, self.cam_to_ndc):
+            # Create optimizer
+            optimizer = torch.optim.Adam(
+                [{'params': [self.pose_coeffs, self.transl_coeffs]}],
+                lr=lr,
+            )
+            scheduler = ExponentialLR(optimizer, gamma=0.999)
 
-        self.pose_coeffs = nn.Parameter(
-            torch.from_numpy(np.concatenate([np.zeros(3), r])[None, ...]).float().to(self.device))
+            for _ in tqdm(range(opt_steps)):
+                _, landmarks_model = self.face_model(
+                    shape_params=self.shape_coeffs,
+                    expression_params=self.exp_coeffs,
+                    pose_params=self.pose_coeffs,
+                    transl=self.transl_coeffs
+                )
+                landmarks_model = landmarks_model[:, 17:][not_nan_indices][None, ...]
+                landmarks_loss = landmark_distance(input_landmarks, landmarks_model, torch.ones(landmarks_model.shape[0], landmarks_model.shape[1]).to(self.device))
 
-        self.transl_coeffs = nn.Parameter(
-            torch.from_numpy(t).t().float().to(self.device)
-        )
+                loss = self.land_weight * landmarks_loss
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
 
     def get_landmarks(self) -> torch.Tensor:
         _, landmarks = self.face_model(
@@ -312,7 +349,7 @@ class FaceReconModel(nn.Module):
             # Create optimizer
             optimizer = torch.optim.Adam(
                 [{'params': [self.shape_coeffs, self.exp_coeffs, self.pose_coeffs, self.tex_coeffs,
-                             self.transl_coeffs, self.light_coeffs]}],
+                             self.transl_coeffs, self.light_coeffs, self.albedo]}],
                 lr=lr,
             )
             scheduler = ExponentialLR(optimizer, gamma=0.999)
@@ -390,6 +427,19 @@ class FaceReconModel(nn.Module):
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
+
+            import pyvista as pv
+            pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
+                (pixel_mask > 0).flatten()]).detach().cpu().numpy()
+            pixels_world_input_ = (
+            pixels_world_input[pixels_world_input[..., -1] != 0][(pixel_mask > 0).flatten()]).detach().cpu().numpy()
+
+            plotter = pv.Plotter()
+            plotter.camera_position = 'xy'
+            plotter.add_mesh(pv.PolyData(pixels_world_rendered_), color='green')
+            plotter.add_mesh(pv.PolyData(pixels_world_input_), color='red')
+            plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy()), color='blue')
+            plotter.show()
 
         color = color.reshape(color.shape[0], *self.coarse2fine_resolutions[-1], 3)
         depth = depth.reshape(depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
