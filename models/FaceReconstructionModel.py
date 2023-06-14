@@ -38,6 +38,7 @@ class FaceReconModel(nn.Module):
         self.shape_coeffs = nn.Parameter(torch.zeros(1, face_model_config.shape_params).float())
         self.exp_coeffs = nn.Parameter(torch.zeros(1, face_model_config.expression_params).float())
         self.pose_coeffs = nn.Parameter(torch.zeros(1, face_model_config.pose_params).float())
+        self.neck_pose_coeffs = nn.Parameter(torch.zeros(1, face_model_config.neck_pose_params).float())
         self.tex_coeffs = nn.Parameter(torch.zeros(1, face_model_config.tex_params).float())
         self.transl_coeffs = nn.Parameter(torch.zeros(1, 3).float().contiguous())
         self.albedo = nn.Parameter(torch.zeros(1, 256, 256, 3).float())
@@ -62,19 +63,28 @@ class FaceReconModel(nn.Module):
             faces = self.faces.cpu()
             uvfaces = self.uvfaces.cpu()
 
-            face_verts = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"]])
+            face_verts = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"], masks["neck"]])
+            face_verts_only_face = np.concatenate([masks["face"], masks["left_eyeball"], masks["right_eyeball"]])
+
             face_faces = []
             face_uvfaces = []
+            face_faces_only_face = []
+            face_uvfaces_only_face = []
 
             for i, face, in enumerate(faces):
                 for face_vert in face:
                     if int(face_vert) in face_verts:
                         face_faces.append(face)
                         face_uvfaces.append(uvfaces[i])
-                        break
 
-            self.face_uvfaces = torch.stack(face_uvfaces).int().to(self.device).contiguous()
+                    if int(face_vert) in face_verts_only_face:
+                        face_faces_only_face.append(face)
+                        face_uvfaces_only_face.append(uvfaces[i])
+
             self.face_faces = torch.stack(face_faces).int().to(self.device).contiguous()
+            self.face_uvfaces = torch.stack(face_uvfaces).int().to(self.device).contiguous()
+            self.face_faces_only_face = torch.stack(face_faces_only_face).int().to(self.device).contiguous()
+            self.face_uvfaces_only_face = torch.stack(face_uvfaces_only_face).int().to(self.device).contiguous()
 
         # Optimize-related settings
         self.coarse2fine_lrs = face_model_config.coarse2fine_lrs
@@ -293,7 +303,7 @@ class FaceReconModel(nn.Module):
         verts_ndc: torch.Tensor,
         albedos: torch.Tensor,
         resolution: Tuple[int, int]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         rast_out, _ = dr.rasterize(self.glctx, verts_ndc, self.face_faces, resolution=resolution)
         texc, _ = dr.interpolate(self.uvcoords, rast_out, self.face_uvfaces)
@@ -312,8 +322,12 @@ class FaceReconModel(nn.Module):
 
         depth, _ = dr.interpolate(verts_cam[..., 2:3].contiguous(), rast_out, self.face_faces)
 
-        mask = (rast_out[..., 3] > 0).float().unsqueeze(1)
-        return color, depth, mask
+        # Get depth and color masks
+        depth_mask = (rast_out[..., 3] > 0).float().unsqueeze(1)
+        rast_out, _ = dr.rasterize(self.glctx, verts_ndc, self.face_faces_only_face, resolution=resolution)
+        color_mask = (rast_out[..., 3] > 0).float().unsqueeze(1)
+
+        return color, depth, depth_mask, color_mask
 
     def optimize(
         self,
@@ -349,7 +363,7 @@ class FaceReconModel(nn.Module):
             # Create optimizer
             optimizer = torch.optim.Adam(
                 [{'params': [self.shape_coeffs, self.exp_coeffs, self.pose_coeffs, self.tex_coeffs,
-                             self.transl_coeffs, self.light_coeffs, self.albedo]}],
+                             self.transl_coeffs, self.light_coeffs, self.albedo, self.neck_pose_coeffs]}],
                 lr=lr,
             )
             scheduler = ExponentialLR(optimizer, gamma=0.999)
@@ -360,7 +374,8 @@ class FaceReconModel(nn.Module):
                     shape_params=self.shape_coeffs,
                     expression_params=self.exp_coeffs,
                     pose_params=self.pose_coeffs,
-                    transl=self.transl_coeffs
+                    transl=self.transl_coeffs,
+                    neck_pose=self.neck_pose_coeffs,
                 )
 
                 vertices_cam, landmarks_cam = self._project_to_cam_space(vertices_world, landmarks_world, self.world_to_cam)
@@ -371,7 +386,7 @@ class FaceReconModel(nn.Module):
                 landmarks_ndc[:, :, 1] = -landmarks_ndc[:, :, 1]
                 landmarks_screen = self._project_to_image_space(landmarks_ndc, resolution)
 
-                color, depth, pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, albedos, resolution)
+                color, depth, depth_pixel_mask, color_pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, albedos, resolution)
 
                 # normal image
                 zy, zx = torch.gradient(depth, dim=(1, 2))
@@ -394,18 +409,36 @@ class FaceReconModel(nn.Module):
                 normals_world_input = self._backproject_to_world_space_normal(input_normal)
                 normals_world_rendered = self._backproject_to_world_space_normal(normal)
 
+                # import pyvista as pv
+                # pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
+                #     (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+                # pixels_world_input_ = (
+                #     pixels_world_input[pixels_world_input[..., -1] != 0][
+                #         (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+                #
+                # plotter = pv.Plotter()
+                # plotter.camera_position = 'xy'
+                # plotter.add_mesh(pv.PolyData(pixels_world_rendered_), color='green')
+                # plotter.add_mesh(pv.PolyData(pixels_world_input_), color='red')
+                # plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy()), color='blue')
+                # plotter.show()
+
                 # Compute losses
                 landmarks_mask = torch.ones(landmarks_screen.shape[:2]).to(self.device)
-                pixel_mask = pixel_mask.reshape(pixel_mask.shape[0], -1)
-                pixel_mask *= input_pixel_mask
-                num_valid_pixels = (pixel_mask > 0).sum(-1)
+                depth_pixel_mask = depth_pixel_mask.reshape(depth_pixel_mask.shape[0], -1)
+                depth_pixel_mask *= input_pixel_mask
+                num_valid_pixels_depth = (depth_pixel_mask > 0).sum(-1)
+
+                color_pixel_mask = color_pixel_mask.reshape(color_pixel_mask.shape[0], -1)
+                color_pixel_mask *= input_pixel_mask
+                num_valid_pixels_color = (color_pixel_mask > 0).sum(-1)
 
                 landmarks_loss = landmark_distance(input_2d_landmarks, landmarks_screen, landmarks_mask)
-                rgb_loss = pixel2pixel_distance(input_color, color, pixel_mask, num_valid_pixels)
-                p2point_loss = pixel2pixel_distance(pixels_world_input, pixels_world_rendered, pixel_mask,
-                                                    num_valid_pixels)
+                rgb_loss = pixel2pixel_distance(input_color, color, color_pixel_mask, num_valid_pixels_color)
+                p2point_loss = point2point_distance(pixels_world_input, pixels_world_rendered, depth_pixel_mask,
+                                                    num_valid_pixels_depth)
                 p2plane_loss = point2plane_distance(pixels_world_input, normals_world_input, pixels_world_rendered,
-                                                    normals_world_rendered, pixel_mask, num_valid_pixels)
+                                                    normals_world_rendered, depth_pixel_mask, num_valid_pixels_depth)
 
                 loss = self.land_weight * landmarks_loss + \
                        self.p2point_weight * p2point_loss + \
@@ -430,9 +463,9 @@ class FaceReconModel(nn.Module):
 
             import pyvista as pv
             pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
-                (pixel_mask > 0).flatten()]).detach().cpu().numpy()
+                (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
             pixels_world_input_ = (
-            pixels_world_input[pixels_world_input[..., -1] != 0][(pixel_mask > 0).flatten()]).detach().cpu().numpy()
+            pixels_world_input[pixels_world_input[..., -1] != 0][(depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
 
             plotter = pv.Plotter()
             plotter.camera_position = 'xy'

@@ -70,6 +70,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--neck_pose_params',
+    type=int,
+    default=3,
+    help='the number of neck pose parameters'
+)
+
+parser.add_argument(
     '--tex_params',
     type=int,
     default=100,
@@ -174,21 +181,21 @@ parser.add_argument(
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.125,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.125,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.0025,
+    default=0.0125,
     help='Texture regularization weight'
 )
 
@@ -202,14 +209,14 @@ parser.add_argument(
 parser.add_argument(
     '--point2point_weight',
     type=float,
-    default=2,
+    default=100,
     help='point to point loss weight'
 )
 
 parser.add_argument(
     '--point2plane_weight',
     type=float,
-    default=10,
+    default=200,
     help='point to plane loss weight'
 )
 
