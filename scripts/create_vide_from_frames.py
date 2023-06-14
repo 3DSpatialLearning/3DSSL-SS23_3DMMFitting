@@ -1,7 +1,12 @@
+import fire
 import cv2
 import os
 
-def convert_images_to_video(image_folder, video_name, frame_rate):
+def convert_images_to_video(
+        image_folder: str = "data/toy_task/multi_frame_rgbd_fitting/222200037/images",
+        video_name: str = "output.mp4",
+        frame_rate: int = 5
+):
     images = [img for img in os.listdir(image_folder) if img.endswith(".png") or img.endswith(".jpg")]
     frame = cv2.imread(os.path.join(image_folder, images[0]))
     height, width, _ = frame.shape
@@ -15,14 +20,5 @@ def convert_images_to_video(image_folder, video_name, frame_rate):
     cv2.destroyAllWindows()
     video.release()
 
-# Provide the folder path containing the RGB images
-image_folder = "data/toy_task/multi_frame_rgbd_fitting/222200037/images"
-
-# Provide the name of the output video file
-video_name = "output2.mp4"
-
-# Set the frame rate (e.g., 5 frames per second)
-frame_rate = 5
-
-# Call the conversion function
-convert_images_to_video(image_folder, video_name, frame_rate)
+if __name__ == '__main__':
+    fire.Fire(convert_images_to_video)

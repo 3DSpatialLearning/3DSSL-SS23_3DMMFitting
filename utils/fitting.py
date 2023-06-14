@@ -10,9 +10,8 @@ from pytorch3d.ops import sample_points_from_meshes
 
 from torch.utils.tensorboard import SummaryWriter
 from flame.FLAME import FLAME
-from utils.transform import rigid_transform_3d
+from utils.transform import rigid_transform_3d, rotation_matrix_to_axis_angle
 from utils.loss import scan_to_mesh_distance, scan_to_mesh_face_distance
-from utils.transform import rotation_matrix_to_axis_angle
 from utils.visualization import visualize_3d_scan_and_3d_face_model
 from dataset.utils import to_device
 
@@ -40,19 +39,8 @@ def fit_flame_to_batched_frame_features(
     landmarks_flame = landmarks_flame.squeeze().cpu().detach().numpy()[landmarks_not_nan_indices].transpose()
     landmarks_input_transposed = landmarks_input.transpose()
     r, t = rigid_transform_3d(landmarks_flame, landmarks_input_transposed)
-    pose.requires_grad = False
-    pose[0, :3] = torch.from_numpy(rotation_matrix_to_axis_angle(r)).to(config.device)
-    pose.requires_grad = True
+    rot = torch.from_numpy(r).to(config.device)
     transl = torch.from_numpy(t.T).to(config.device)
-
-    predicted_vertices, predicted_landmarks = flame_model(shape_params=shape, expression_params=exp,
-                                                          pose_params=pose, transl=transl)
-    visualize_3d_scan_and_3d_face_model(
-        points_scan=frame_batch['point'].squeeze().cpu().numpy(),
-        points_3d_face=predicted_vertices.detach().cpu().squeeze().numpy(),
-        faces_3d_face=flame_model.faces,
-        predicted_landmarks_3d=landmarks_input,
-    )
 
     # optimize flame shape and expression
     frame_batch = to_device(frame_batch, config.device)
@@ -66,7 +54,8 @@ def fit_flame_to_batched_frame_features(
     for _ in pbar:
         optimizer.zero_grad()
         predicted_vertices, predicted_landmarks = flame_model(shape_params=shape, expression_params=exp,
-                                                              pose_params=pose, transl=transl)
+                                                              pose_params=pose, rot=rot, transl=transl)
+
         mesh = Meshes(verts=predicted_vertices, faces=flame_model_faces)
         random_indices = random.sample(list(range(frame_batch['point'].shape[1])), config.num_samples)
         random_points = frame_batch['point'][:, random_indices]
@@ -87,7 +76,7 @@ def fit_flame_to_batched_frame_features(
         points_3d_face=predicted_vertices.detach().cpu().squeeze().numpy(),
         faces_3d_face=flame_model.faces,
         predicted_landmarks_3d=landmarks_input,
-        screenshot_path=f"{frame_id}.png",
+        # screenshot_path=f"{frame_id}.png",
     )
 
     return shape, exp, pose

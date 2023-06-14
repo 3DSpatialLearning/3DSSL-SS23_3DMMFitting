@@ -26,9 +26,7 @@ from utils.fitting import fit_flame_to_batched_frame_features
 """
 
 if __name__ == '__main__':
-
     config = get_config()
-    print("Selected device:", config.device)
 
     # data loading
     landmark_detector = DlibLandmarkDetector()
