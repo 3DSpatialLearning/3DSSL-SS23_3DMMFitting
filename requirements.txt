@@ -4,6 +4,10 @@ torchvision
 tensorboard
 smplx
 pyvista
+scipy
+chumpy
+Ninja
 opencv-python
+nvdiffrast @ git+https://github.com/NVlabs/nvdiffrast.git
 cmake
 dlib
