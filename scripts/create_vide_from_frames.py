@@ -16,10 +16,10 @@ def convert_images_to_video(image_folder, video_name, frame_rate):
     video.release()
 
 # Provide the folder path containing the RGB images
-image_folder = "data/toy_task/multi_frame_rgbd_fitting/222200037/images"
+image_folder = "./output/rendered"
 
 # Provide the name of the output video file
-video_name = "output2.mp4"
+video_name = "output_rendered.mp4"
 
 # Set the frame rate (e.g., 5 frames per second)
 frame_rate = 5

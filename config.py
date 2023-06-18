@@ -51,14 +51,14 @@ parser.add_argument(
 parser.add_argument(
     '--shape_params',
     type=int,
-    default=100,
+    default=300,
     help='the number of shape parameters'
 )
 
 parser.add_argument(
     '--expression_params',
     type=int,
-    default=50,
+    default=100,
     help='the number of expression parameters'
 )
 
@@ -144,17 +144,31 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--coarse2fine_lrs',
+    '--coarse2fine_lrs_first_frame',
     type=list,
     default=[1e-2, 5e-3, 1e-3],
-    help='learning rate associated to every level'
+    help='learning rate associated to every level for the first frame'
 )
 
 parser.add_argument(
-    '--coarse2fine_opt_steps',
+    '--coarse2fine_lrs_next_frames',
+    type=list,
+    default=[1e-2, 5e-3, 1e-3],
+    help='learning rate associated to every level for the first frame'
+)
+
+parser.add_argument(
+    '--coarse2fine_opt_steps_first_frame',
     type=list,
     default=[300, 200, 100],
-    help='number of optimization steps associated to every level'
+    help='number of optimization steps associated to every level for the first frame'
+)
+
+parser.add_argument(
+    '--coarse2fine_opt_steps_next_frames',
+    type=list,
+    default=[50, 30, 20],
+    help='number of optimization steps associated to every level for the next frames'
 )
 
 parser.add_argument(
@@ -181,21 +195,21 @@ parser.add_argument(
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=0.125,
+    default=0.025,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=0.125,
+    default=0.025,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.0125,
+    default=0.025,
     help='Texture regularization weight'
 )
 
@@ -209,14 +223,14 @@ parser.add_argument(
 parser.add_argument(
     '--point2point_weight',
     type=float,
-    default=100,
+    default=2,
     help='point to point loss weight'
 )
 
 parser.add_argument(
     '--point2plane_weight',
     type=float,
-    default=200,
+    default=10,
     help='point to plane loss weight'
 )
 
