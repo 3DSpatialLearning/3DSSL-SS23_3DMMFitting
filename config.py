@@ -195,21 +195,21 @@ parser.add_argument(
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.0125,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.0125,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.025,
+    default=0.0125,
     help='Texture regularization weight'
 )
 

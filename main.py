@@ -12,6 +12,7 @@ from dataset.transforms import ToTensor
 
 from models.LandmarkDetector import DlibLandmarkDetector
 from models.FaceReconstructionModel import FaceReconModel
+from models.HairSegmenter import HairSegmenter
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -34,9 +35,13 @@ if __name__ == '__main__':
 
     # data loading
     landmark_detector = DlibLandmarkDetector()
+    hair_segmentor = HairSegmenter()
+
     transforms = TransformCompose([ToTensor()])
     dataset = CameraFrameDataset(config.cam_data_dir, need_backprojection=True, has_gt_landmarks=True, transform=transforms)
     dataset.precompute_landmarks(landmark_detector, force_precompute=False)
+    dataset.precompute_hair_masks(hair_segmentor, force_precompute=False)
+
     dataloader = DataLoader(dataset, batch_size=dataset.num_cameras(), shuffle=False, num_workers=0)
 
     # get camera settings
@@ -77,7 +82,6 @@ if __name__ == '__main__':
         flame_landmarks = flame_landmarks[0].detach().cpu().numpy()
 
         for gt_landmark, flame_landmark in zip(gt_landmarks, flame_landmarks):
-            print(gt_landmark)
             cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (0, 0, 255), -1)
             cv2.circle(input_color, (int(gt_landmark[0] * input_color.shape[1] / first_frame_features["image"].shape[2:][1]), int(gt_landmark[1] * input_color.shape[0] / first_frame_features["image"].shape[2:][0])), 2, (0, 255, 0), -1)
 

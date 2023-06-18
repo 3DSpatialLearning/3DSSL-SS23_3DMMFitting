@@ -1,15 +1,16 @@
 import numpy as np
-from scipy.spatial.distance import cdist
-from torchvision.transforms.transforms import Compose as TransformCompose
-from torch import nn
 import os
 import cv2
+
 from tqdm import tqdm
 
 from torch.utils.data import Dataset
-from utils.transform import backproject_points, get_coordinates_from_depth_map_by_threshold, filter_outliers_landmarks, \
-    intrinsics_to_projection
+from torch import nn
+from torchvision.transforms.transforms import Compose as TransformCompose
+from scipy.spatial.distance import cdist
 
+from utils.transform import backproject_points, get_coordinates_from_depth_map_by_threshold, filter_outliers_landmarks
+from models.HairSegmenter import HairSegmenter
 
 """
     This dataset is used to load a all relevant data related to a sequence of frames from cameras.
@@ -54,6 +55,7 @@ class CameraFrameDataset(Dataset):
     gt_landmarks_subdir: str = "landmarks"
     predicted_2d_landmarks_subdir: str = "predicted_2d_landmarks"
     predicted_3d_landmarks_subdir: str = "predicted_3d_landmarks"
+    predicted_hair_masks_subdir: str = "predicted_hair_masks"
     intrinsics_filename: str = "intrinsics.npy"
     extrinsics_filename: str = "extrinsics.npy"
 
@@ -74,10 +76,14 @@ class CameraFrameDataset(Dataset):
         list_of_cam_folders = [folder for folder in list_of_cam_folders if folder != '.gitkeep']
         self.list_of_cam_folders = sorted(list_of_cam_folders)
         cam_folder = self.list_of_cam_folders[0]
+
         # check if we have predicted landmarks precomputed
         # assumes all cameras have the same structure, therefore we only check the first one
         cam_folder_subdirs = os.listdir(os.path.join(self.path_to_data, cam_folder))
         self.has_predicted_landmarks = self.predicted_3d_landmarks_subdir in cam_folder_subdirs and self.predicted_2d_landmarks_subdir in cam_folder_subdirs
+
+        # check if we have predicted hair masks precomputed
+        self.has_predicted_hair_masks = self.predicted_hair_masks_subdir in cam_folder_subdirs
 
         # get list of (cam, frame) to iterate over
         self.list_of_frame_ids = sorted(os.listdir(os.path.join(self.path_to_data, cam_folder, self.image_subdir)))
@@ -114,6 +120,10 @@ class CameraFrameDataset(Dataset):
 
         # filter out low consistency points
         features["pixel_mask"] = np.where(features["consistency"] < self.consistency_threshold, 0, 1)[..., None]
+
+        # filter out hair points
+        hair_mask = np.load(os.path.join(path, self.predicted_hair_masks_subdir, f"{frame_id}.npy"))
+        features["pixel_mask"] = np.bitwise_and(features["pixel_mask"], ~hair_mask[..., None])
 
         # back-project points and get their normals (could be removed later when loss is computed on image space)
         if self.need_backprojection:
@@ -173,6 +183,29 @@ class CameraFrameDataset(Dataset):
 
                 np.save(os.path.join(predicted_landmarks_2d_dir, f"{frame}.npy"), landmark_2d)
                 np.save(os.path.join(predicted_landmarks_3d_dir, f"{frame}.npy"), landmark_3d)
+
+    """
+        Precompute hair segmentation mask for all frames in all cameras in the dataset using the provided hair segmentor if they are not already precomputed
+        and saved in disk.
+        :param hair_segmentor: hair segmentor
+        :param force_precompute: if True, precompute segmentation map even if they are already existing
+    """
+
+    def precompute_hair_masks(self, hair_segmentor: HairSegmenter, force_precompute: bool = False):
+        if not self.has_predicted_hair_masks or force_precompute:
+            for (cam, frame) in (pbar := tqdm(self.list_of_cam_frame_pairs)):
+                pbar.set_description(f"Computing hair mask for camera {cam} and frame {frame}")
+                path_to_cam_folder = os.path.join(self.path_to_data, cam)
+
+                image = cv2.imread(os.path.join(path_to_cam_folder, self.image_subdir, f"{frame}.png"))
+
+                predicted_hair_masks_dir = os.path.join(path_to_cam_folder, self.predicted_hair_masks_subdir)
+                if not os.path.exists(predicted_hair_masks_dir):
+                    os.makedirs(predicted_hair_masks_dir)
+
+                # predict hair mask
+                hair_mask = hair_segmentor.segment(image, False)
+                np.save(os.path.join(predicted_hair_masks_dir, f"{frame}.npy"), hair_mask)
 
     def num_cameras(self):
         return len(self.list_of_cam_folders)

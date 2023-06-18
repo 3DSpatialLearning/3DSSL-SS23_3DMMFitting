@@ -5,6 +5,7 @@ import argparse
 import nvdiffrast.torch as dr
 import pickle
 import torch.nn.functional as F
+import pyvista as pv
 
 from tqdm import tqdm
 from typing import Tuple
@@ -384,14 +385,14 @@ class FaceReconModel(nn.Module):
                 )
 
                 vertices_cam, landmarks_cam = self._project_to_cam_space(vertices_world, landmarks_world, self.world_to_cam)
-                #albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
+                albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
 
                 vertices_ndc = self._project_to_ndc_space(vertices_cam, cam2ndc)
                 landmarks_ndc = self._project_to_ndc_space(landmarks_cam, cam2ndc)
                 landmarks_ndc[:, :, 1] = -landmarks_ndc[:, :, 1]
                 landmarks_screen = self._project_to_image_space(landmarks_ndc, resolution)
 
-                color, depth, depth_pixel_mask, color_pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, self.albedo, resolution)
+                color, depth, depth_pixel_mask, color_pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, albedos, resolution)
 
                 # normal image
                 zy, zx = torch.gradient(depth, dim=(1, 2))
@@ -413,20 +414,6 @@ class FaceReconModel(nn.Module):
 
                 normals_world_input = self._backproject_to_world_space_normal(input_normal)
                 normals_world_rendered = self._backproject_to_world_space_normal(normal)
-
-                # import pyvista as pv
-                # pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
-                #     (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
-                # pixels_world_input_ = (
-                #     pixels_world_input[pixels_world_input[..., -1] != 0][
-                #         (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
-                #
-                # plotter = pv.Plotter()
-                # plotter.camera_position = 'xy'
-                # plotter.add_mesh(pv.PolyData(pixels_world_rendered_), color='green')
-                # plotter.add_mesh(pv.PolyData(pixels_world_input_), color='red')
-                # plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy()), color='blue')
-                # plotter.show()
 
                 # Compute losses
                 landmarks_mask = torch.ones(landmarks_screen.shape[:2]).to(self.device)
@@ -470,4 +457,17 @@ class FaceReconModel(nn.Module):
         depth = depth.reshape(depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
         input_color = input_color.reshape(input_color.shape[0], *self.coarse2fine_resolutions[-1], 3)
         input_depth = input_depth.reshape(input_depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
+
+        pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
+            (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+        pixels_world_input_ = (
+            pixels_world_input[pixels_world_input[..., -1] != 0][
+                (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+
+        plotter = pv.Plotter()
+        plotter.camera_position = 'xy'
+        plotter.add_mesh(pv.PolyData(pixels_world_rendered_), color='green')
+        plotter.add_mesh(pv.PolyData(pixels_world_input_), color='red')
+        plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy()), color='blue')
+        plotter.show()
         return color, depth, input_color, input_depth, landmarks_screen
