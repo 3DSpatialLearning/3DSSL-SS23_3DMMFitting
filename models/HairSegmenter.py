@@ -8,14 +8,14 @@ class HairSegmenter:
     """
     A class that performs hair segmentation on images using the MediaPipe framework.
 
-    Install the pre-trained hair segmentation model from https://storage.googleapis.com/mediapipe-assets/hair_segmentation.tflite
+    Install the pre-trained hair segmentation model from https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite
     Then place it under data/hair_segmentation
 
     Example usage:
         segmenter = HairSegmenter()
         hair_mask = segmenter.segment(image)  # Perform hair segmentation
     """    
-    def __init__(self, model_path: str = "data/hair_segmentation/hair_segmentation.tflite"):
+    def __init__(self, model_path: str = "data/hair_segmentation/hair_segmenter.tflite"):
         """
         Initializes the HairSegmenter class.
 
