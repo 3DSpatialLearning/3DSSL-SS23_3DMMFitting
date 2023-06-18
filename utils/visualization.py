@@ -66,3 +66,41 @@ def visualize_3d_scan_and_3d_face_model(points_scan: np.ndarray,
         plotter.screenshot(screenshot_path)
     else:
         plotter.show()
+
+def visualize_landmark_alignment(input_landmarks_3d: np.ndarray, flame_landmarks_3d_before_alignment: np.ndarray, flame_landmarks_3d_after_alignment: np.ndarray, screenshot_path: str = None):
+    if screenshot_path is not None:
+        plotter = pv.Plotter(shape=(1,2), off_screen=True)
+        plotter.set_background('white')
+    else:
+        plotter = pv.Plotter(shape=(1,2))
+
+    error = 0
+    plotter.subplot(0, 0)
+    plotter.add_mesh(input_landmarks_3d, color='blue', point_size=5, style='points')
+    plotter.add_mesh(flame_landmarks_3d_before_alignment, color='red', point_size=5, style='points')
+    for point_a, point_b in zip(input_landmarks_3d, flame_landmarks_3d_before_alignment):
+        error += np.linalg.norm(point_a - point_b)
+        line = pv.Line(point_a, point_b)
+        plotter.add_mesh(line, color='black', line_width=2, opacity=0.25)
+    plotter.camera_position = 'xy'
+    plotter.add_text("Before Rigid alignment")
+    plotter.add_text("Error: {:.4f}".format(error), position='lower_left', font_size=9)
+    plotter.add_axes(line_width=5, labels_off=False)
+
+    error = 0
+    plotter.subplot(0, 1)
+    plotter.add_mesh(input_landmarks_3d, color='blue', point_size=5, style='points')
+    plotter.add_mesh(flame_landmarks_3d_after_alignment, color='red', point_size=5, style='points')
+    for point_a, point_b in zip(input_landmarks_3d, flame_landmarks_3d_after_alignment):
+        error += np.linalg.norm(point_a - point_b)
+        line = pv.Line(point_a, point_b)
+        plotter.add_mesh(line, color='black', line_width=2, opacity=0.25)
+    plotter.camera_position = 'xy'
+    plotter.add_text("After Rigid alignment")
+    plotter.add_text("Error: {:.4f}".format(error), position='lower_left', font_size=9)
+    plotter.add_axes(line_width=5, labels_off=False)
+
+    if screenshot_path is not None:
+        plotter.screenshot(screenshot_path)
+    else:
+        plotter.show()

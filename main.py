@@ -1,4 +1,3 @@
-import fire
 import torch
 import cv2
 import numpy as np
@@ -30,19 +29,13 @@ from models.FaceReconstructionModel import FaceReconModel
   - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
 """
 
-torch.backends.cudnn.benchmark = True
-
-
-def main(
-        cam_data_dir: str = "data/toy_task/multi_frame_rgbd_fitting",
-        num_frames_for_shape_fitting: int = 3,
-):
+if __name__ == '__main__':
     config = get_config()
 
     # data loading
     landmark_detector = DlibLandmarkDetector()
     transforms = TransformCompose([ToTensor()])
-    dataset = CameraFrameDataset(cam_data_dir, need_backprojection=True, has_gt_landmarks=True, transform=transforms)
+    dataset = CameraFrameDataset(config.cam_data_dir, need_backprojection=True, has_gt_landmarks=True, transform=transforms)
     dataset.precompute_landmarks(landmark_detector, force_precompute=False)
     dataloader = DataLoader(dataset, batch_size=dataset.num_cameras(), shuffle=False, num_workers=0)
 
@@ -102,5 +95,3 @@ def main(
         cv2.waitKey(0)
 
 
-if __name__ == '__main__':
-    fire.Fire(main)

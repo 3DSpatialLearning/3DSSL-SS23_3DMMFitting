@@ -199,7 +199,7 @@ class FLAME(nn.Module):
         return dyn_lmk_faces_idx, dyn_lmk_b_coords
 
     def forward(self, shape_params=None, expression_params=None, pose_params=None, neck_pose=None, eye_pose=None,
-                transl=None):
+                rot=None, transl=None):
         """
             Input:
                 shape_params: N X number of shape parameters
@@ -238,6 +238,12 @@ class FLAME(nn.Module):
         landmarks = vertices2landmarks(vertices, self.faces_tensor,
                                        lmk_faces_idx,
                                        lmk_bary_coords)
+
+        if rot is not None:
+            if rot.dim() == 2:
+                rot = rot.unsqueeze(dim=0).repeat(self.batch_size, 1, 1)
+            landmarks = torch.bmm(rot, landmarks.permute(0, 2, 1)).permute(0, 2, 1)
+            vertices = torch.bmm(rot, vertices.permute(0, 2, 1)).permute(0, 2, 1)
 
         if self.use_3D_translation:
             landmarks += transl.unsqueeze(dim=1)
