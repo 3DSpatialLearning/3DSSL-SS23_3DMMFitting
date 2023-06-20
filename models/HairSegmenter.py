@@ -17,12 +17,12 @@ class HairSegmenter:
         hair_mask = segmenter.segment(image)  # Perform hair segmentation
     """
 
-    def __init__(self, model_path: str = "data/hair_segmentation/hair_segmenter.tflite"):
+    def __init__(self, model_path: str = "data/checkpoints/hair_segmenter.tflite"):
         """
         Initializes the HairSegmenter class.
 
         Args:
-            model_path (str): Path to the hair segmentation model (default: "data/hair_segmentation/hair_segmentation.tflite").
+            model_path (str): Path to the hair segmentation model (default: "data/checkpoints/hair_segmentation.tflite").
         """
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.ImageSegmenterOptions(base_options=base_options, output_category_mask=True)
