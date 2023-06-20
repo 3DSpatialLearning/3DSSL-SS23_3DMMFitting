@@ -11,3 +11,4 @@ opencv-python
 nvdiffrast @ git+https://github.com/NVlabs/nvdiffrast.git
 cmake
 dlib
+mediapipe==0.10.0
