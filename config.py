@@ -87,7 +87,7 @@ parser.add_argument(
     '--tex_params',
     type=int,
     default=100,
-    help='the number of expression parameters'
+    help='the number of texture parameters'
 )
 
 parser.add_argument(

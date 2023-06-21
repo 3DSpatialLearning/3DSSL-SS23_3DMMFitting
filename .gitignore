@@ -170,6 +170,7 @@ cython_debug/
 
 # ignore models and checkpoints
 *.dat
+*.tflite
 
 # ignore logs
 /runs
