@@ -109,6 +109,7 @@ class FaceReconModel(nn.Module):
         self.cam_to_ndc = None
         self.intrinsics = None
         self.extrinsics = None
+        self.cameras_rot = None
 
         self.coarse2fine_resolutions = list(
             map(lambda x: resize_long_side(
@@ -126,6 +127,7 @@ class FaceReconModel(nn.Module):
         # Get world to cam matrices
         self.world_to_cam = []
         self.extrinsics = []
+        self.cameras_rot = []
 
         inverse = torch.Tensor(
             [[1, 0, 0, 0],
@@ -136,9 +138,11 @@ class FaceReconModel(nn.Module):
         for extrinsic_matrix in extrinsic_matrices:
             self.world_to_cam.append((inverse @ torch.inverse(extrinsic_matrix)).t())
             self.extrinsics.append(extrinsic_matrix.t())
+            self.cameras_rot.append(torch.inverse(extrinsic_matrix[:3, :3]))
 
         self.world_to_cam = torch.stack(self.world_to_cam).float().to(self.device)
         self.extrinsics = torch.stack(self.extrinsics).float().to(self.device)
+        self.cameras_rot = torch.stack(self.cameras_rot).float().to(self.device)
 
         # Get cam to ndc matrices
         self.cam_to_ndc = []
@@ -207,16 +211,17 @@ class FaceReconModel(nn.Module):
             scheduler = ExponentialLR(optimizer, gamma=0.999)
 
             for _ in tqdm(range(opt_steps)):
-                _, landmarks_model = self.face_model(
+                _, landmarks_68_model, landmarks_mp_model = self.face_model(
                     shape_params=self.shape_coeffs,
                     expression_params=self.exp_coeffs,
                     pose_params=self.pose_coeffs,
-                    transl=self.transl_coeffs
+                    transl=self.transl_coeffs,
+                    cameras_rot=self.cameras_rot,
                 )
-                landmarks_model = landmarks_model[:, 17:][not_nan_indices][None, ...]
-                landmarks_loss = landmark_distance(input_landmarks, landmarks_model, torch.ones(landmarks_model.shape[0], landmarks_model.shape[1]).to(self.device))
+                landmarks_68_model = landmarks_68_model[:, 17:][not_nan_indices][None, ...]
+                landmarks_68_loss = landmark_distance(input_landmarks, landmarks_68_model, torch.ones(landmarks_68_model.shape[0], landmarks_68_model.shape[1]).to(self.device))
 
-                loss = self.land_weight * landmarks_loss
+                loss = self.land_weight * landmarks_68_loss
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -256,16 +261,19 @@ class FaceReconModel(nn.Module):
     def _project_to_cam_space(
         self,
         vertices_world: torch.Tensor,
-        landmarks_world: torch.Tensor,
+        landmarks_68_world: torch.Tensor,
+        landmarks_mp_world: torch.Tensor,
         world_to_cam: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         vertices = torch.cat((vertices_world, torch.ones(vertices_world.shape[0], vertices_world.shape[1], 1).to(self.device)), dim=-1)
-        landmarks = torch.cat((landmarks_world, torch.ones(landmarks_world.shape[0], landmarks_world.shape[1], 1).to(self.device)),
-                              dim=-1)
-
+        landmarks_68 = torch.cat((landmarks_68_world, torch.ones(landmarks_68_world.shape[0], landmarks_68_world.shape[1], 1).to(self.device)),
+                                  dim=-1)
+        landmarks_mp = torch.cat((landmarks_mp_world, torch.ones(landmarks_mp_world.shape[0], landmarks_mp_world.shape[1], 1).to(self.device)),
+                                  dim=-1)
         vertices_cam = torch.matmul(vertices, world_to_cam)
-        landmarks_cam = torch.matmul(landmarks, world_to_cam)
-        return vertices_cam, landmarks_cam
+        landmarks_68_cam = torch.matmul(landmarks_68, world_to_cam)
+        landmarks_mp_cam = torch.matmul(landmarks_mp, world_to_cam)
+        return vertices_cam, landmarks_68_cam, landmarks_mp_cam
 
     def _project_to_ndc_space(
         self,
@@ -336,8 +344,8 @@ class FaceReconModel(nn.Module):
         self,
         frame_features: dict,
         first_frame: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        color, depth, input_color, input_depth = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        color, depth, input_color, input_depth, landmarks_68_screen, landmarks_mp_screen = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
 
         for resolution, lr, opt_steps, cam2ndc, intrinsic in zip(self.coarse2fine_resolutions,
                                                                  self.coarse2fine_lrs_first_frame if first_frame else self.coarse2fine_lrs_next_frames,
@@ -376,21 +384,25 @@ class FaceReconModel(nn.Module):
 
             for _ in tqdm(range(opt_steps)):
                 # Get vertices in cam space and compute vertices attributes
-                vertices_world, landmarks_world = self.face_model(
+                vertices_world, landmarks_68_world, landmarks_mp_world = self.face_model(
                     shape_params=self.shape_coeffs,
                     expression_params=self.exp_coeffs,
                     pose_params=self.pose_coeffs,
                     transl=self.transl_coeffs,
                     neck_pose=self.neck_pose_coeffs,
+                    cameras_rot=self.cameras_rot,
                 )
 
-                vertices_cam, landmarks_cam = self._project_to_cam_space(vertices_world, landmarks_world, self.world_to_cam)
+                vertices_cam, landmarks_68_cam, landmarks_mp_cam = self._project_to_cam_space(vertices_world, landmarks_68_world, landmarks_mp_world, self.world_to_cam)
                 albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
 
                 vertices_ndc = self._project_to_ndc_space(vertices_cam, cam2ndc)
-                landmarks_ndc = self._project_to_ndc_space(landmarks_cam, cam2ndc)
-                landmarks_ndc[:, :, 1] = -landmarks_ndc[:, :, 1]
-                landmarks_screen = self._project_to_image_space(landmarks_ndc, resolution)
+                landmarks_68_ndc = self._project_to_ndc_space(landmarks_68_cam, cam2ndc)
+                landmarks_mp_ndc = self._project_to_ndc_space(landmarks_mp_cam, cam2ndc)
+                landmarks_68_ndc[:, :, 1] = -landmarks_68_ndc[:, :, 1]
+                landmarks_mp_ndc[:, :, 1] = -landmarks_mp_ndc[:, :, 1]
+                landmarks_68_screen = self._project_to_image_space(landmarks_68_ndc, resolution)
+                landmarks_mp_screen = self._project_to_image_space(landmarks_mp_ndc, resolution)
 
                 color, depth, depth_pixel_mask, color_pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, albedos, resolution)
 
@@ -416,7 +428,7 @@ class FaceReconModel(nn.Module):
                 normals_world_rendered = self._backproject_to_world_space_normal(normal)
 
                 # Compute losses
-                landmarks_mask = torch.ones(landmarks_screen.shape[:2]).to(self.device)
+                landmarks_68_mask = torch.ones(landmarks_68_screen.shape[:2]).to(self.device)
                 depth_pixel_mask = depth_pixel_mask.reshape(depth_pixel_mask.shape[0], -1)
                 depth_pixel_mask *= input_pixel_mask
                 num_valid_pixels_depth = (depth_pixel_mask > 0).sum(-1)
@@ -425,14 +437,14 @@ class FaceReconModel(nn.Module):
                 color_pixel_mask *= input_pixel_mask
                 num_valid_pixels_color = (color_pixel_mask > 0).sum(-1)
 
-                landmarks_loss = landmark_distance(input_2d_landmarks, landmarks_screen, landmarks_mask)
+                landmarks_68_loss = landmark_distance(input_2d_landmarks, landmarks_68_screen, landmarks_68_mask)
                 rgb_loss = pixel2pixel_distance(input_color, color, color_pixel_mask, num_valid_pixels_color)
                 p2point_loss = point2point_distance(pixels_world_input, pixels_world_rendered, depth_pixel_mask,
                                                     num_valid_pixels_depth)
                 p2plane_loss = point2plane_distance(pixels_world_input, normals_world_input, pixels_world_rendered,
                                                     normals_world_rendered, depth_pixel_mask, num_valid_pixels_depth)
 
-                loss = self.land_weight * landmarks_loss + \
+                loss = self.land_weight * landmarks_68_loss + \
                        self.p2point_weight * p2point_loss + \
                        self.p2plane_weight * p2plane_loss + \
                        self.rgb_weight * rgb_loss + \
@@ -440,7 +452,7 @@ class FaceReconModel(nn.Module):
                        self.exp_reg_weight * self.exp_coeffs.norm(p=2, dim=1) + \
                        self.tex_reg_weight * self.tex_coeffs.norm(p=2, dim=1)
 
-                print("landmark: ", self.land_weight * landmarks_loss)
+                print("landmark: ", self.land_weight * landmarks_68_loss)
                 print("p2point: ", self.p2point_weight * p2point_loss)
                 print("p2plane: ", self.p2plane_weight * p2plane_loss)
                 print("rgb: ", self.rgb_weight * rgb_loss)
@@ -458,16 +470,14 @@ class FaceReconModel(nn.Module):
         input_color = input_color.reshape(input_color.shape[0], *self.coarse2fine_resolutions[-1], 3)
         input_depth = input_depth.reshape(input_depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
 
-        pixels_world_rendered_ = (pixels_world_rendered[pixels_world_rendered[..., -1] != 0][
-            (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
-        pixels_world_input_ = (
-            pixels_world_input[pixels_world_input[..., -1] != 0][
-                (depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+        pixels_world_rendered_ = (pixels_world_rendered[0][(depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
+        pixels_world_input_ = (pixels_world_input[0][(depth_pixel_mask > 0).flatten()]).detach().cpu().numpy()
 
         plotter = pv.Plotter()
+        plotter.set_background('white')
         plotter.camera_position = 'xy'
-        plotter.add_mesh(pv.PolyData(pixels_world_rendered_), color='green')
         plotter.add_mesh(pv.PolyData(pixels_world_input_), color='red')
-        plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy()), color='blue')
+        plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy(), np.concatenate((np.ones((self.faces.shape[0], 1)) * 3,
+                                             self.faces.cpu().numpy()), axis=-1).reshape(-1).astype(np.int64)), color='green')
         plotter.show()
-        return color, depth, input_color, input_depth, landmarks_screen
+        return color, depth, input_color, input_depth, landmarks_68_screen, landmarks_mp_screen

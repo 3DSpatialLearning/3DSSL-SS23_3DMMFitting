@@ -10,9 +10,9 @@ from config import get_config
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
 
-from models.LandmarkDetector import DlibLandmarkDetector
 from models.FaceReconstructionModel import FaceReconModel
 from models.HairSegmenter import HairSegmenter
+from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     config = get_config()
 
     # data loading
-    landmark_detector = DlibLandmarkDetector()
+    landmark_detector = LandmarkDetectorPIPENET()
     hair_segmentor = HairSegmenter()
 
     transforms = TransformCompose([ToTensor()])
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     face_recon_model.set_initial_pose(gt_landmark)
 
     for frame_num, frame_features in enumerate(dataloader):
-        color, depth, input_color, input_depth, flame_landmarks = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
         color = (color[0].detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)
         depth = depth[0].detach().cpu().numpy()
@@ -79,11 +79,15 @@ if __name__ == '__main__':
         input_depth = input_depth[0].detach().cpu().numpy()
 
         gt_landmarks = frame_features["predicted_landmark_2d"][0].detach().cpu().numpy()
-        flame_landmarks = flame_landmarks[0].detach().cpu().numpy()
+        flame_68_landmarks = flame_68_landmarks[0].detach().cpu().numpy()
+        flame_mp_landmarks = flame_mp_landmarks[0].detach().cpu().numpy()
 
-        for gt_landmark, flame_landmark in zip(gt_landmarks, flame_landmarks):
+        for gt_landmark, flame_landmark in zip(gt_landmarks, flame_68_landmarks):
             cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (0, 0, 255), -1)
             cv2.circle(input_color, (int(gt_landmark[0] * input_color.shape[1] / first_frame_features["image"].shape[2:][1]), int(gt_landmark[1] * input_color.shape[0] / first_frame_features["image"].shape[2:][0])), 2, (0, 255, 0), -1)
+
+        for flame_landmark in flame_mp_landmarks:
+            cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (255, 0, 0), -1)
 
         alpha = 0.6
         blended = (cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)).astype(np.uint8)

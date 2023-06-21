@@ -13,6 +13,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--mediapipe_landmark_embedding_path',
+    type=str,
+    default='data/flame_model/mediapipe_landmark_embedding.npz',
+    help='Mediapipe landmark embedding path for FLAME'
+)
+
+parser.add_argument(
     '--static_landmark_embedding_path',
     type=str,
     default='data/flame_model/flame_static_embedding.pkl',
@@ -209,7 +216,7 @@ parser.add_argument(
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.0125,
+    default=0.125,
     help='Texture regularization weight'
 )
 
@@ -223,14 +230,14 @@ parser.add_argument(
 parser.add_argument(
     '--point2point_weight',
     type=float,
-    default=2,
+    default=2000,
     help='point to point loss weight'
 )
 
 parser.add_argument(
     '--point2plane_weight',
     type=float,
-    default=10,
+    default=1000,
     help='point to plane loss weight'
 )
 

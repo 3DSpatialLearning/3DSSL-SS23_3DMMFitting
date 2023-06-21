@@ -115,10 +115,12 @@ class FLAME(nn.Module):
         self.register_buffer('lbs_weights',
                              to_tensor(to_np(self.flame_model.weights), dtype=self.dtype))
 
-        # Static and Dynamic Landmark embeddings for FLAME
+        # Static, Mediapipe and Dynamic Landmark embeddings for FLAME
 
         with open(config.static_landmark_embedding_path, 'rb') as f:
             static_embeddings = Struct(**pickle.load(f, encoding='latin1'))
+
+        mediapipe_lmk_embedding = np.load(config.mediapipe_landmark_embedding_path, allow_pickle=True, encoding='latin1')
 
         lmk_faces_idx = (static_embeddings.lmk_face_idx).astype(np.int64)
         self.register_buffer('lmk_faces_idx',
@@ -127,6 +129,14 @@ class FLAME(nn.Module):
         lmk_bary_coords = static_embeddings.lmk_b_coords
         self.register_buffer('lmk_bary_coords',
                              torch.tensor(lmk_bary_coords, dtype=self.dtype))
+
+        mp_lmk_faces_idx = (mediapipe_lmk_embedding['lmk_face_idx']).astype(np.int64)
+        self.register_buffer('mp_lmk_faces_idx',
+                             torch.tensor(mp_lmk_faces_idx, dtype=torch.long))
+
+        mp_lmk_bary_coords = mediapipe_lmk_embedding['lmk_b_coords']
+        self.register_buffer('mp_lmk_bary_coords',
+                             torch.tensor(mp_lmk_bary_coords, dtype=self.dtype))
 
         if self.use_face_contour:
             conture_embeddings = np.load(config.dynamic_landmark_embedding_path,
@@ -155,7 +165,7 @@ class FLAME(nn.Module):
 
     def _find_dynamic_lmk_idx_and_bcoords(self, vertices, pose, dynamic_lmk_faces_idx,
                                           dynamic_lmk_b_coords,
-                                          neck_kin_chain, dtype=torch.float32):
+                                          neck_kin_chain, cameras_rot, dtype=torch.float32):
         """
             Selects the face contour depending on the reletive position of the head
             Input:
@@ -182,6 +192,8 @@ class FLAME(nn.Module):
         for idx in range(len(neck_kin_chain)):
             rel_rot_mat = torch.bmm(rot_mats[:, idx], rel_rot_mat)
 
+        rel_rot_mat = cameras_rot @ rel_rot_mat # Different views need to be considered
+
         y_rot_angle = torch.round(
             torch.clamp(-rot_mat_to_euler(rel_rot_mat) * 180.0 / np.pi,
                         max=39)).to(dtype=torch.long)
@@ -199,7 +211,7 @@ class FLAME(nn.Module):
         return dyn_lmk_faces_idx, dyn_lmk_b_coords
 
     def forward(self, shape_params=None, expression_params=None, pose_params=None, neck_pose=None, eye_pose=None,
-                rot=None, transl=None):
+                rot=None, transl=None, cameras_rot=None):
         """
             Input:
                 shape_params: N X number of shape parameters
@@ -225,31 +237,42 @@ class FLAME(nn.Module):
             self.batch_size, 1)
         lmk_bary_coords = self.lmk_bary_coords.unsqueeze(dim=0).repeat(
             self.batch_size, 1, 1)
+
+        mp_lmk_faces_idx = self.mp_lmk_faces_idx.unsqueeze(dim=0).repeat(
+            self.batch_size, 1)
+        mp_lmk_bary_coords = self.mp_lmk_bary_coords.unsqueeze(dim=0).repeat(
+            self.batch_size, 1, 1)
+
         if self.use_face_contour:
             dyn_lmk_faces_idx, dyn_lmk_bary_coords = self._find_dynamic_lmk_idx_and_bcoords(
                 vertices, full_pose, self.dynamic_lmk_faces_idx,
                 self.dynamic_lmk_bary_coords,
-                self.neck_kin_chain, dtype=self.dtype)
+                self.neck_kin_chain, cameras_rot, dtype=self.dtype)
 
             lmk_faces_idx = torch.cat([dyn_lmk_faces_idx, lmk_faces_idx], 1)
             lmk_bary_coords = torch.cat(
                 [dyn_lmk_bary_coords, lmk_bary_coords], 1)
 
-        landmarks = vertices2landmarks(vertices, self.faces_tensor,
-                                       lmk_faces_idx,
-                                       lmk_bary_coords)
+        landmarks_68 = vertices2landmarks(vertices, self.faces_tensor,
+                                          lmk_faces_idx,
+                                          lmk_bary_coords)
 
+        landmarks_mp = vertices2landmarks(vertices, self.faces_tensor,
+                                          mp_lmk_faces_idx,
+                                          mp_lmk_bary_coords)
         if rot is not None:
             if rot.dim() == 2:
                 rot = rot.unsqueeze(dim=0).repeat(self.batch_size, 1, 1)
-            landmarks = torch.bmm(rot, landmarks.permute(0, 2, 1)).permute(0, 2, 1)
+            landmarks_68 = torch.bmm(rot, landmarks_68.permute(0, 2, 1)).permute(0, 2, 1)
+            landmarks_mp = torch.bmm(rot, landmarks_mp.permute(0, 2, 1)).permute(0, 2, 1)
             vertices = torch.bmm(rot, vertices.permute(0, 2, 1)).permute(0, 2, 1)
 
         if self.use_3D_translation:
-            landmarks += transl.unsqueeze(dim=1)
+            landmarks_68 += transl.unsqueeze(dim=1)
+            landmarks_mp += transl.unsqueeze(dim=1)
             vertices += transl.unsqueeze(dim=1)
 
-        return vertices, landmarks
+        return vertices, landmarks_68, landmarks_mp
 
 
 class FLAMETex(nn.Module):
