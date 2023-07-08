@@ -1,0 +1,3 @@
+[submodule "models/mvp"]
+	path = models/mvp
+	url = https://github.com/facebookresearch/mvp.git
