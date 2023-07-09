@@ -19,13 +19,14 @@ def scan_to_mesh_face_distance(scan_points: torch.tensor, mesh: Meshes):
 def scan_to_mesh_distance(scans_points,
                           scans_normals,
                           meshes_points,
-                          meshes_normals):
+                          meshes_normals,
+                          threshold=0.005):
     return custom_chamfer_distance_single_direction(
         scans_points,
         meshes_points,
         x_normals=scans_normals,
         y_normals=meshes_normals,
-        threshold=0.00005
+        threshold=threshold
     )
 
 
@@ -251,6 +252,6 @@ def point2plane_distance(
     p2plane_distance = s2d_distance + d2s_distance
     p2plane_distance = torch.where(p2p_distance < threshold, p2plane_distance, 0)
     p2plane_distance *= pixels_mask
-    p2plane_distance = p2plane_distance.sum() / num_valid_pixels
+    p2plane_distance = torch.mean(p2plane_distance.sum(-1) / num_valid_pixels)
 
     return p2plane_distance

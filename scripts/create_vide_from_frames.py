@@ -2,6 +2,7 @@ import fire
 import cv2
 import os
 
+
 def convert_images_to_video(
         image_folder: str = "data/toy_task/multi_frame_rgbd_fitting/222200037/images",
         video_name: str = "output.mp4",
@@ -19,6 +20,7 @@ def convert_images_to_video(
 
     cv2.destroyAllWindows()
     video.release()
+
 
 if __name__ == '__main__':
     fire.Fire(convert_images_to_video)

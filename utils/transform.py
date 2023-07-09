@@ -10,14 +10,22 @@ def rotation_matrix_to_axis_angle(rotation: np.ndarray) -> np.ndarray:
     return axis_angle.squeeze()
 
 
-def intrinsics_to_projection(intrinsics: torch.Tensor, resolution: tuple[int, int], znear: float = .01, zfar: float = 10.) -> torch.Tensor:
+def axis_angle_to_rotation_matrix(axis_angle: np.ndarray) -> np.ndarray:
+    assert axis_angle.shape == (3,), "Axis angle must be 3 dimensional"
+    rotation, _ = cv2.Rodrigues(axis_angle)
+    return rotation.squeeze()
+
+
+def intrinsics_to_projection(intrinsics: torch.Tensor, resolution: tuple[int, int], znear: float = .01,
+                             zfar: float = 10.) -> torch.Tensor:
     """
     Converts the given intrinsics matrix to a OpenGL projection matrix.
     :param intrinsics: 3x3
     :return: 4x4 OpenGL projection matrix
     """
     assert intrinsics.shape == (3, 3)
-    fx, fy = intrinsics[0, 0] * (resolution[1]/(intrinsics[0, 2] * 2)), intrinsics[1, 1] * (resolution[0]/(intrinsics[1, 2] * 2))
+    fx, fy = intrinsics[0, 0] * (resolution[1] / (intrinsics[0, 2] * 2)), intrinsics[1, 1] * (
+                resolution[0] / (intrinsics[1, 2] * 2))
     cx, cy = resolution[1] / 2, resolution[0] / 2
     sx = intrinsics[0, 1]
     w, h = resolution[1], resolution[0]

@@ -65,8 +65,10 @@ class LandmarkDetectorPIPENET(nn.Module):
             [transforms.Resize((self.cfg.input_size, self.cfg.input_size)), transforms.ToTensor(), self.normalize])
 
     def forward(self, image: np.ndarray):
-        detection = dlib.get_frontal_face_detector()(image, 1)[0]
-
+        detections = self.face_detector(image, 1)
+        if len(detections) == 0:
+            return None
+        detection = detections[0]
         det_xmin = detection.left()
         det_ymin = detection.top()
         det_width = detection.right() - detection.left()
@@ -105,13 +107,13 @@ class LandmarkDetectorPIPENET(nn.Module):
         lms_pred_merge = torch.cat((tmp_x, tmp_y), dim=1).flatten()
         lms_pred = lms_pred.cpu().numpy()
         lms_pred_merge = lms_pred_merge.cpu().numpy()
-        cv2.rectangle(image, (det_xmin, det_ymin), (det_xmax, det_ymax), (0, 0, 255), 2)
-        for i in range(self.cfg.num_lms):
-            x_pred = lms_pred_merge[i * 2] * det_width
-            y_pred = lms_pred_merge[i * 2 + 1] * det_height
-            cv2.circle(image, (int(x_pred) + det_xmin, int(y_pred) + det_ymin), 1, (0, 0, 255), 2)
-        cv2.imshow('image', cv2.resize(image, (image.shape[1] // 4, image.shape[0] // 4)))
-        cv2.waitKey(0)
+        # cv2.rectangle(image, (det_xmin, det_ymin), (det_xmax, det_ymax), (0, 0, 255), 2)
+        # for i in range(self.cfg.num_lms):
+        #     x_pred = lms_pred_merge[i * 2] * det_width
+        #     y_pred = lms_pred_merge[i * 2 + 1] * det_height
+        #     cv2.circle(image, (int(x_pred) + det_xmin, int(y_pred) + det_ymin), 1, (0, 0, 255), 2)
+        # cv2.imshow('image', cv2.resize(image, (image.shape[1] // 4, image.shape[0] // 4)))
+        # cv2.waitKey(0)
         lms_pred_merge = np.reshape(lms_pred_merge, (self.cfg.num_lms, 2))
         lms_pred_merge[:, 0] = lms_pred_merge[:, 0] * det_width + det_xmin
         lms_pred_merge[:, 1] = lms_pred_merge[:, 1] * det_height + det_ymin

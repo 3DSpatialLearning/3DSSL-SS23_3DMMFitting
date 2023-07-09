@@ -15,6 +15,7 @@ from utils.loss import scan_to_mesh_distance, scan_to_mesh_face_distance
 from utils.visualization import visualize_3d_scan_and_3d_face_model
 from dataset.utils import to_device
 
+from pytorch3d.loss import chamfer_distance
 def fit_flame_to_batched_frame_features(
         frame_id: int,
         flame_model: FLAME,

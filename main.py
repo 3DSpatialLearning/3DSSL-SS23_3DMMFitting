@@ -47,8 +47,10 @@ if __name__ == '__main__':
     # get camera settings
     first_frame_features = next(iter(dataloader))
 
-    extrinsic_matrices = first_frame_features["extrinsics"]
-    intrinsic_matrices = first_frame_features["intrinsics"]
+    rgb_camera_ids = config.rgb_camera_ids
+    rgb_camera_mask = np.isin(first_frame_features["camera_id"], rgb_camera_ids)
+    extrinsic_matrices = first_frame_features["extrinsics"][rgb_camera_mask]
+    intrinsic_matrices = first_frame_features["intrinsics"][rgb_camera_mask]
 
     # get face reconstruction model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -67,10 +69,10 @@ if __name__ == '__main__':
     )
 
     # compute the initial alignment
-    gt_landmark = first_frame_features["predicted_landmark_3d"][0]
-    face_recon_model.set_initial_pose(gt_landmark)
+    face_recon_model.set_initial_pose(first_frame_features)
 
     for frame_num, frame_features in enumerate(dataloader):
+        landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
         color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
         color = (color[0].detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)
@@ -78,7 +80,7 @@ if __name__ == '__main__':
         input_color = (input_color[0].detach().cpu().contiguous().numpy()[:, :, ::-1] * 255).astype(np.uint8)
         input_depth = input_depth[0].detach().cpu().numpy()
 
-        gt_landmarks = frame_features["predicted_landmark_2d"][0].detach().cpu().numpy()
+        gt_landmarks = frame_features["predicted_landmark_2d"][landmark_mask].squeeze().detach().cpu().numpy()
         flame_68_landmarks = flame_68_landmarks[0].detach().cpu().numpy()
         flame_mp_landmarks = flame_mp_landmarks[0].detach().cpu().numpy()
 
@@ -93,9 +95,9 @@ if __name__ == '__main__':
         blended = (cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)).astype(np.uint8)
 
 
-        cv2.imwrite(f"./output/blended_{frame_num}.png", blended)
-        cv2.imwrite(f"./output/input_{frame_num}.png", input_color)
-        cv2.imwrite(f"./output/rendered_{frame_num}.png", color)
+        # cv2.imwrite(f"./output/blended_{frame_num}.png", blended)
+        # cv2.imwrite(f"./output/input_{frame_num}.png", input_color)
+        # cv2.imwrite(f"./output/rendered_{frame_num}.png", color)
 
         cv2.imshow("blended", blended)
         cv2.imshow("original", input_color)

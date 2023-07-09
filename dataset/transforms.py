@@ -14,7 +14,6 @@ class ToTensor:
             features["image"] *= 255.
         features["consistency"] = torch.from_numpy(features["consistency"])
         features["depth"] = self.to_tensor(features["depth"][..., None])
-        features["normal"] = self.to_tensor(features["normal"])
         features["pixel_mask"] = self.to_tensor(features["pixel_mask"])
         features["intrinsics"] = torch.from_numpy(features["intrinsics"])
         features["extrinsics"] = torch.from_numpy(features["extrinsics"])

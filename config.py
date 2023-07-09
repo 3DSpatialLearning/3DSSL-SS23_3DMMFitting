@@ -1,5 +1,6 @@
 import argparse
 import torch
+import json
 
 parser = argparse.ArgumentParser(description='FLAME fitting config')
 
@@ -84,6 +85,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--eye_pose_params',
+    type=int,
+    default=6,
+    help='the number of eye pose parameters'
+)
+
+parser.add_argument(
     '--tex_params',
     type=int,
     default=100,
@@ -116,8 +124,33 @@ parser.add_argument(
 parser.add_argument(
     '--cam_data_dir',
     type=str,
-    default="data/toy_task/multi_frame_rgbd_fitting",
+    default="data/subject_0",
     help='Directory containing the camera data'
+)
+
+# "[222200036, 222200037, 222200038, 222200039, 222200041, 222200042,"
+#             "222200044, 222200045, 222200046, 222200047, 222200048, 222200049]"
+
+parser.add_argument(
+    '--depth_camera_ids',
+    type=json.loads,
+    default="[222200037, 222200036]",
+    help='Id of the cameras that are used for the depth fitting. Note, depth camera'
+         'ids must be a subset of the rgb camera ids.'
+)
+
+parser.add_argument(
+    '--rgb_camera_ids',
+    type=json.loads,
+    default="[222200037, 222200036]",
+    help='Id of the cameras that are used for the rgb fitting'
+)
+
+parser.add_argument(
+    '--landmark_camera_id',
+    type=json.loads,
+    default="[222200037]",
+    help='Id of the camera that are used for the landmark fitting. It can only be one camera.'
 )
 
 parser.add_argument(
@@ -153,7 +186,7 @@ parser.add_argument(
 parser.add_argument(
     '--coarse2fine_lrs_first_frame',
     type=list,
-    default=[1e-2, 5e-3, 1e-3],
+    default=[1e-2, 2e-3, 3e-4],
     help='learning rate associated to every level for the first frame'
 )
 
@@ -202,21 +235,21 @@ parser.add_argument(
 parser.add_argument(
     '--shape_regularization_weight',
     type=float,
-    default=0.0125,
+    default=0.01,
     help='Shape regularization weight'
 )
 
 parser.add_argument(
     '--exp_regularization_weight',
     type=float,
-    default=0.0125,
+    default=0.01,
     help='Expression regularization weight'
 )
 
 parser.add_argument(
     '--tex_regularization_weight',
     type=float,
-    default=0.125,
+    default=0.025,
     help='Texture regularization weight'
 )
 
@@ -230,15 +263,22 @@ parser.add_argument(
 parser.add_argument(
     '--point2point_weight',
     type=float,
-    default=2000,
+    default=20000,
     help='point to point loss weight'
 )
 
 parser.add_argument(
     '--point2plane_weight',
     type=float,
-    default=1000,
+    default=30000,
     help='point to plane loss weight'
+)
+
+parser.add_argument(
+    '--chamfer_weight',
+    type=float,
+    default=300,
+    help='chamfer loss weight'
 )
 
 parser.add_argument(
@@ -248,6 +288,12 @@ parser.add_argument(
     help='Number of frames to use for shape fitting'
 )
 
+parser.add_argument(
+    '--use_chamfer',
+    type=bool,
+    default=False,
+    help='If true use chamfer loss instead of point to point and point to plane'
+)
 
 def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
     config = parser.parse_args()
