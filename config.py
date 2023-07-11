@@ -134,7 +134,7 @@ parser.add_argument(
 parser.add_argument(
     '--depth_camera_ids',
     type=json.loads,
-    default="[222200037, 222200036]",
+    default="[222200036, 222200037, 222200049]",
     help='Id of the cameras that are used for the depth fitting. Note, depth camera'
          'ids must be a subset of the rgb camera ids.'
 )
@@ -142,7 +142,7 @@ parser.add_argument(
 parser.add_argument(
     '--rgb_camera_ids',
     type=json.loads,
-    default="[222200037, 222200036]",
+    default="[222200036, 222200037, 222200049]",
     help='Id of the cameras that are used for the rgb fitting'
 )
 
@@ -151,6 +151,20 @@ parser.add_argument(
     type=json.loads,
     default="[222200037]",
     help='Id of the camera that are used for the landmark fitting. It can only be one camera.'
+)
+
+parser.add_argument(
+    '--frontal_camera_id',
+    type=json.loads,
+    default="[222200037]",
+    help='Id of the frontal camera',
+)
+
+parser.add_argument(
+    '--scan_2_mesh_camera_ids',
+    type=json.loads,
+    default="[222200036, 222200037, 222200049]",
+    help='Id of the cameras that are used to compute the scan to mesh distance',
 )
 
 parser.add_argument(
