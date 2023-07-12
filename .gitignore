@@ -168,7 +168,7 @@ cython_debug/
 *.npy
 *.png
 
-# ignore models and checkpoints
+# ignore models_ and checkpoints
 *.dat
 *.tflite
 
@@ -178,5 +178,5 @@ toy_example/runs
 
 !.gitkeep
 
-!models/PIPNET/lib
+!models_/PIPNET/lib
 !data/checkpoints/pipnet/data_300W_COFW_WFLW/pip_32_16_60_r18_l2_l1_10_1_nb10_wcc/epoch59.pth

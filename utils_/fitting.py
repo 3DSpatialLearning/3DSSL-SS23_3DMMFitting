@@ -10,9 +10,9 @@ from pytorch3d.ops import sample_points_from_meshes
 
 from torch.utils.tensorboard import SummaryWriter
 from flame.FLAME import FLAME
-from utils.transform import rigid_transform_3d, rotation_matrix_to_axis_angle
-from utils.loss import scan_to_mesh_distance, scan_to_mesh_face_distance
-from utils.visualization import visualize_3d_scan_and_3d_face_model
+from utils_.transform import rigid_transform_3d, rotation_matrix_to_axis_angle
+from utils_.loss import scan_to_mesh_distance, scan_to_mesh_face_distance
+from utils_.visualization import visualize_3d_scan_and_3d_face_model
 from dataset.utils import to_device
 
 from pytorch3d.loss import chamfer_distance

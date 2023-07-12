@@ -8,7 +8,7 @@ import pyvista as pv
 
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.utils import dict_tensor_to_np
-from models.LandmarkDetector import DlibLandmarkDetector
+from models_.LandmarkDetector import DlibLandmarkDetector
 from config import get_config
 
 main_dir = os.path.dirname(os.path.abspath(__file__))

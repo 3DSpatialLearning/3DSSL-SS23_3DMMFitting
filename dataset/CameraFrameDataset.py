@@ -9,8 +9,8 @@ from torch import nn
 from torchvision.transforms.transforms import Compose as TransformCompose
 from scipy.spatial.distance import cdist
 
-from utils.transform import backproject_points, filter_outliers_landmarks
-from models.HairSegmenter import HairSegmenter
+from utils_.transform import backproject_points, filter_outliers_landmarks
+from models_.HairSegmenter import HairSegmenter
 
 """
     This dataset is used to load a all relevant data related to a sequence of frames from cameras.
