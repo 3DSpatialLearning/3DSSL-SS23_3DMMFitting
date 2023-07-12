@@ -10,9 +10,9 @@ from config import get_config
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
 
-from models.FaceReconstructionModel import FaceReconModel
-from models.HairSegmenter import HairSegmenter
-from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
+from models_.FaceReconstructionModel import FaceReconModel
+from models_.HairSegmenter import HairSegmenter
+from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     face_recon_model.to(device)
 
     # set transformation matrices for projection
-    face_recon_model.set_transformation_matrices(
+    face_recon_model.set_transformation_matrices_for_optimization(
         extrinsic_matrices=extrinsic_matrices,
         intrinsic_matrices=intrinsic_matrices,
     )

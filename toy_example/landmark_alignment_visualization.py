@@ -6,10 +6,10 @@ from config import get_config
 
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
-from models.LandmarkDetector import DlibLandmarkDetector
+from models_.LandmarkDetector import DlibLandmarkDetector
 from flame.FLAME import FLAME
-from utils.transform import rigid_transform_3d
-from utils.visualization import visualize_landmark_alignment
+from utils_.transform import rigid_transform_3d
+from utils_.visualization import visualize_landmark_alignment
 
 if __name__ == '__main__':
     config = get_config(path_to_data_dir="../")

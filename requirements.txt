@@ -13,3 +13,4 @@ cmake
 dlib
 mediapipe==0.10.0
 Cython
+kornia
