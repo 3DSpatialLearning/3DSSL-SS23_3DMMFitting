@@ -502,7 +502,6 @@ class FaceReconModel(nn.Module):
             if len(self.rgb_camera_ids) > 0:
                 input_rgb, input_rgb_pixel_mask = self._get_input_rgb_data(resolution, frame_features)
             if len(self.depth_camera_ids) > 0:
-                print("Computing depth loss")
                 pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features, rgb_in_depth_masks)
                 if self.use_chamfer:
                     pixels_world = []
