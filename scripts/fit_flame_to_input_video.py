@@ -2,6 +2,10 @@ import torch
 import cv2
 import numpy as np
 
+from torch.utils.tensorboard import SummaryWriter
+
+from datetime import datetime
+
 from torch.utils.data import DataLoader
 from torchvision.transforms.transforms import Compose as TransformCompose
 
@@ -14,23 +18,29 @@ from models.FaceReconstructionModel import FaceReconModel
 from models.HairSegmenter import HairSegmenter
 from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
-"""
-  Multi-camera multi-frame FLAME fitting pipeline.
-  - data_dir: directory containing subfolders each correspoding to a camera data, with the following structure:
-    data_dir
-    ├── camera_1
-    │   ├── colmap_consistency/
-    │   ├── colmap_depth/
-    │   ├── colmap_normals/
-    │   ├── images/
-    │   ├── intrinsics.npy
-    │   └── extrinsics.npy
-    ├── camera_2
-      ...
-  - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
-"""
+from pathlib import Path
+
 
 if __name__ == '__main__':
+
+    config = get_config()
+
+    # data loading
+    experiment_name = config.experiment_name
+    output_frame_rate = config.output_frame_rate
+    output_video_name = config.output_video_name
+    workdir = config.workdir
+    draw_landmarks = config.draw_landmarks
+
+    # Set project dir
+    project_dir = (Path(workdir) / f"{experiment_name}").absolute()
+    project_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = (
+        project_dir
+        / f"{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
+    )
+    run_dir.mkdir(parents=True)
+
     config = get_config()
 
     # data loading
@@ -79,40 +89,41 @@ if __name__ == '__main__':
     # compute the initial alignment
     face_recon_model.set_initial_pose(first_frame_features)
 
+    # Get the video writer
+    height, width = face_recon_model.coarse2fine_resolutions[-1]
+    video = cv2.VideoWriter(str(run_dir / output_video_name), cv2.VideoWriter_fourcc(*"mp4v"), output_frame_rate, (3 * width, height))
+
+    # Get writer
+    writer = SummaryWriter(log_dir=str(run_dir))
+
     for frame_num, frame_features in enumerate(dataloader):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
-        
+        # Log the losses
+        writer.add_scalar('per frame scan to mesh distance', scan_to_mesh_distance.item(), frame_num)
+
         color = (color[rgb_in_landmarks_mask].squeeze(0).detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)
         input_color = (input_color[rgb_in_landmarks_mask].squeeze(0).detach().cpu().contiguous().numpy()[:, :, ::-1] * 255).astype(np.uint8)
 
-        gt_landmarks = frame_features["predicted_landmark_2d"][landmark_mask].squeeze().detach().cpu().numpy()
-        flame_68_landmarks = flame_68_landmarks[0].detach().cpu().numpy()
-        flame_mp_landmarks = flame_mp_landmarks[0].detach().cpu().numpy()
+        if draw_landmarks:
+            gt_landmarks = frame_features["predicted_landmark_2d"][landmark_mask].squeeze().detach().cpu().numpy()
+            flame_68_landmarks = flame_68_landmarks[0].detach().cpu().numpy()
+            flame_mp_landmarks = flame_mp_landmarks[0].detach().cpu().numpy()
 
-        for gt_landmark, flame_landmark in zip(gt_landmarks, flame_68_landmarks):
-            cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (0, 0, 255), -1)
-            cv2.circle(input_color, (int(gt_landmark[0] * input_color.shape[1] / first_frame_features["image"].shape[2:][1]), int(gt_landmark[1] * input_color.shape[0] / first_frame_features["image"].shape[2:][0])), 2, (0, 255, 0), -1)
+            for gt_landmark, flame_landmark in zip(gt_landmarks, flame_68_landmarks):
+                cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (0, 0, 255), -1)
+                cv2.circle(input_color, (int(gt_landmark[0] * input_color.shape[1] / first_frame_features["image"].shape[2:][1]), int(gt_landmark[1] * input_color.shape[0] / first_frame_features["image"].shape[2:][0])), 2, (0, 255, 0), -1)
 
-        for flame_landmark in flame_mp_landmarks:
-            cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (255, 0, 0), -1)
+            for flame_landmark in flame_mp_landmarks:
+                cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (255, 0, 0), -1)
 
-        alpha = 0.6
+        alpha = 0.5
         blended = (cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)).astype(np.uint8)
 
-
-        # cv2.imwrite(f"./output/blended_{frame_num}.png", blended)
-        # cv2.imwrite(f"./output/input_{frame_num}.png", input_color)
-        # cv2.imwrite(f"./output/rendered_{frame_num}.png", color)
-
-        cv2.imwrite(f"./blended_{frame_num}.png", blended)
-        cv2.imwrite(f"./input_{frame_num}.png", input_color)
-        cv2.imwrite(f"./rendered_{frame_num}.png", color)
-
-        # cv2.imshow("blended", blended)
-        # cv2.imshow("original", input_color)
-        # cv2.imshow("rendered", color)
-        # cv2.waitKey(0)
-
-
+        combined_img = cv2.hconcat([blended, input_color, color])
+        
+        video.write(combined_img)
+    
+    cv2.destroyAllWindows()
+    video.release()

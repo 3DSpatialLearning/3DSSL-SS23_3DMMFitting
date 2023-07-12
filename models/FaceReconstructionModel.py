@@ -485,7 +485,7 @@ class FaceReconModel(nn.Module):
         frame_features: dict,
         first_frame: bool = False
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
+        color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, scan_to_mesh_loss = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
 
         for resolution, lr, opt_steps, cam2ndc, intrinsic in zip(self.coarse2fine_resolutions,
                                                                  self.coarse2fine_lrs_first_frame if first_frame else self.coarse2fine_lrs_next_frames,
@@ -502,7 +502,6 @@ class FaceReconModel(nn.Module):
             if len(self.rgb_camera_ids) > 0:
                 input_rgb, input_rgb_pixel_mask = self._get_input_rgb_data(resolution, frame_features)
             if len(self.depth_camera_ids) > 0:
-                print("Computing depth loss")
                 pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features, rgb_in_depth_masks)
                 if self.use_chamfer:
                     pixels_world = []
@@ -579,7 +578,6 @@ class FaceReconModel(nn.Module):
 
                 # Compute depth loss
                 if len(self.depth_camera_ids > 0):
-                    print("Computing depth loss")
                     depth = depth[rgb_in_depth_masks]
                     depth = -depth.reshape(depth.shape[0], -1, 1)
 
@@ -657,8 +655,7 @@ class FaceReconModel(nn.Module):
                                                      threshold=0.000025)
         scan_to_mesh_loss = torch.sqrt(scan_to_mesh_loss)
 
-        print("Scan to mesh loss: ", scan_to_mesh_loss)
         # increase the counter
         self.counter += 1
-        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks
+        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, scan_to_mesh_loss
 
