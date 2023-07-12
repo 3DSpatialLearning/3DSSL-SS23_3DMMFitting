@@ -49,8 +49,12 @@ if __name__ == '__main__':
 
     rgb_camera_ids = config.rgb_camera_ids
     rgb_camera_mask = np.isin(first_frame_features["camera_id"], rgb_camera_ids)
-    extrinsic_matrices = first_frame_features["extrinsics"][rgb_camera_mask]
-    intrinsic_matrices = first_frame_features["intrinsics"][rgb_camera_mask]
+    extrinsic_matrices_optimization = first_frame_features["extrinsics"][rgb_camera_mask]
+    intrinsic_matrices_optimization = first_frame_features["intrinsics"][rgb_camera_mask]
+
+    mesh_2_scan_camera_ids = config.depth_camera_ids
+    mesh_2_scan_camera_mask = np.isin(first_frame_features["camera_id"], mesh_2_scan_camera_ids)
+    extrinsic_matrices_fused_point_cloud = first_frame_features["extrinsics"][mesh_2_scan_camera_mask]
 
     # get face reconstruction model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -63,22 +67,25 @@ if __name__ == '__main__':
     face_recon_model.to(device)
 
     # set transformation matrices for projection
-    face_recon_model.set_transformation_matrices(
-        extrinsic_matrices=extrinsic_matrices,
-        intrinsic_matrices=intrinsic_matrices,
+    face_recon_model.set_transformation_matrices_for_optimization(
+        extrinsic_matrices=extrinsic_matrices_optimization,
+        intrinsic_matrices=intrinsic_matrices_optimization,
     )
 
+    face_recon_model.set_transformation_matrices_for_fused_point_cloud(
+        extrinsic_matrices=extrinsic_matrices_fused_point_cloud,
+    )
+    
     # compute the initial alignment
     face_recon_model.set_initial_pose(first_frame_features)
 
     for frame_num, frame_features in enumerate(dataloader):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
-        color = (color[0].detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)
-        depth = depth[0].detach().cpu().numpy()
-        input_color = (input_color[0].detach().cpu().contiguous().numpy()[:, :, ::-1] * 255).astype(np.uint8)
-        input_depth = input_depth[0].detach().cpu().numpy()
+        
+        color = (color[rgb_in_landmarks_mask].squeeze(0).detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)
+        input_color = (input_color[rgb_in_landmarks_mask].squeeze(0).detach().cpu().contiguous().numpy()[:, :, ::-1] * 255).astype(np.uint8)
 
         gt_landmarks = frame_features["predicted_landmark_2d"][landmark_mask].squeeze().detach().cpu().numpy()
         flame_68_landmarks = flame_68_landmarks[0].detach().cpu().numpy()
@@ -99,9 +106,13 @@ if __name__ == '__main__':
         # cv2.imwrite(f"./output/input_{frame_num}.png", input_color)
         # cv2.imwrite(f"./output/rendered_{frame_num}.png", color)
 
-        cv2.imshow("blended", blended)
-        cv2.imshow("original", input_color)
-        cv2.imshow("rendered", color)
-        cv2.waitKey(0)
+        cv2.imwrite(f"./blended_{frame_num}.png", blended)
+        cv2.imwrite(f"./input_{frame_num}.png", input_color)
+        cv2.imwrite(f"./rendered_{frame_num}.png", color)
+
+        # cv2.imshow("blended", blended)
+        # cv2.imshow("original", input_color)
+        # cv2.imshow("rendered", color)
+        # cv2.waitKey(0)
 
 

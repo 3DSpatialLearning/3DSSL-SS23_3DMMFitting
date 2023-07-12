@@ -1,6 +1,4 @@
 numpy==1.23.1
-torch
-torchvision
 tensorboard
 smplx
 pyvista
@@ -13,3 +11,5 @@ cmake
 dlib
 mediapipe==0.10.0
 Cython
+chardet
+kornia

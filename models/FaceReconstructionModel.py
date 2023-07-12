@@ -106,7 +106,7 @@ class FaceReconModel(nn.Module):
         self.coarse2fine_opt_steps_next_frames = face_model_config.coarse2fine_opt_steps_next_frames
 
         # Loss-related settings
-        self.land_weight = face_model_config.landmark_weight
+        self.landmarks_68_weight = face_model_config.landmarks_68_weight
         self.rgb_weight = face_model_config.rgb_weight
         self.p2point_weight = face_model_config.point2point_weight
         self.p2plane_weight = face_model_config.point2plane_weight
@@ -227,7 +227,7 @@ class FaceReconModel(nn.Module):
                 landmarks_68_model = landmarks_68_model[:, 17:][not_nan_indices][None, ...]
                 landmarks_68_loss = landmark_distance(input_landmarks, landmarks_68_model, torch.ones(landmarks_68_model.shape[0], landmarks_68_model.shape[1]).to(self.device))
 
-                loss = self.land_weight * landmarks_68_loss
+                loss = self.landmarks_68_weight * landmarks_68_loss
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -238,6 +238,7 @@ class FaceReconModel(nn.Module):
         self,
         xys_cam: torch.Tensor,
         depths: torch.Tensor,
+        extrinsics: torch.Tensor,
     ):
         # Convert to cam space
         xyzs_cam = depths * xys_cam
@@ -245,7 +246,7 @@ class FaceReconModel(nn.Module):
         # Convert to world space
         xyzs_cam = torch.concatenate([xyzs_cam, torch.ones(xyzs_cam.shape[0], xyzs_cam.shape[1], 1).to(self.device)],
                                      dim=-1)
-        xyzs_world = torch.matmul(xyzs_cam, self.extrinsics)
+        xyzs_world = torch.matmul(xyzs_cam, extrinsics)
         return xyzs_world[:, :, :3]
 
     def _backproject_to_world_space_normal(
@@ -367,6 +368,8 @@ class FaceReconModel(nn.Module):
 
         del input_rgb, input_rgb_pixel_mask, input_rgb_combined
 
+        input_rgb_combined_resized = input_rgb_combined_resized.permute(0, 2, 3, 1)
+
         input_rgb = input_rgb_combined_resized[..., :3].reshape(input_rgb_combined_resized.shape[0], -1, 3)
         input_rgb_pixel_mask = input_rgb_combined_resized[..., -1].reshape(input_rgb_combined_resized.shape[0], -1)
 
@@ -392,7 +395,8 @@ class FaceReconModel(nn.Module):
         input_depth_combined_resized = F.interpolate(input_depth_combined, size=resolution).to(self.device)
 
         del input_depth, input_depth_pixel_mask, input_depth_combined
-
+        
+        input_depth_combined_resized = input_depth_combined_resized.permute(0, 2, 3, 1)
         input_depth = input_depth_combined_resized[..., :1].reshape(input_depth_combined_resized.shape[0], -1, 1)
         input_depth_pixel_mask = input_depth_combined_resized[..., -1].reshape(input_depth_combined_resized.shape[0], -1)
 
@@ -410,7 +414,7 @@ class FaceReconModel(nn.Module):
             dim=-1)
         xys_cam = torch.matmul(xys_homo, intrinsic)
 
-        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth)
+        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth, self.extrinsics)
         normals_world_input = self._compute_normals_from_depth(
             pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
         normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
@@ -422,9 +426,9 @@ class FaceReconModel(nn.Module):
         resolution: Tuple[int, int],
         intrinsic: torch.Tensor,
         frame_features: dict,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         # Get input depth data (pixels backprojected to world space and it's normals) and depth pixel mask
-        depth_masks = torch.isin(frame_features["camera_id"], self.depth_camera_ids)
+        depth_masks = torch.isin(frame_features["camera_id"], self.scan_2_mesh_camera_ids)
 
         input_depth = frame_features["depth"][depth_masks]
         input_depth_pixel_mask = frame_features["pixel_mask"][depth_masks]
@@ -437,6 +441,7 @@ class FaceReconModel(nn.Module):
 
         del input_depth, input_depth_pixel_mask, input_depth_combined
 
+        input_depth_combined_resized = input_depth_combined_resized.permute(0, 2, 3, 1)
         input_depth = input_depth_combined_resized[..., :1].reshape(input_depth_combined_resized.shape[0], -1, 1)
         input_depth_pixel_mask = input_depth_combined_resized[..., -1].reshape(input_depth_combined_resized.shape[0], -1)
 
@@ -454,12 +459,12 @@ class FaceReconModel(nn.Module):
             dim=-1)
         xys_cam = torch.matmul(xys_homo, intrinsic)
 
-        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth)
+        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth, self.extrinsics_fused_point_cloud)
         normals_world_input = self._compute_normals_from_depth(
             pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
         normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
 
-        return pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam
+        return pixels_world_input, normals_world_input
 
     def _get_input_landmarks_data(
         self,
@@ -477,8 +482,8 @@ class FaceReconModel(nn.Module):
         self,
         frame_features: dict,
         first_frame: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
 
         for resolution, lr, opt_steps, cam2ndc, intrinsic in zip(self.coarse2fine_resolutions,
                                                                  self.coarse2fine_lrs_first_frame if first_frame else self.coarse2fine_lrs_next_frames,
@@ -492,9 +497,9 @@ class FaceReconModel(nn.Module):
             rgb_in_landmarks_masks = torch.isin(frame_features["camera_id"][rgb_masks], self.landmark_camera_id)
 
             # Get input data for optimization
-            if self.rgb_camera_ids > 0:
+            if len(self.rgb_camera_ids) > 0:
                 input_rgb, input_rgb_pixel_mask = self._get_input_rgb_data(resolution, frame_features)
-            if self.depth_camera_ids > 0:
+            if len(self.depth_camera_ids) > 0:
                 pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features)
                 if self.use_chamfer:
                     pixels_world = []
@@ -503,8 +508,8 @@ class FaceReconModel(nn.Module):
                         pixels_world.append(pixels_world_input[i][input_depth_pixel_mask[i] > 0])
                         normals_world.append(normals_world_input[i][input_depth_pixel_mask[i] > 0])
                     
-                    pixels_world_input = torch.stack(pixels_world)
-                    normals_world_input = torch.stack(normals_world)
+                    pixels_world_input = torch.concatenate(pixels_world)
+                    normals_world_input = torch.concatenate(normals_world)
 
             input_2d_landmarks = self._get_input_landmarks_data(resolution, frame_features)
 
@@ -561,7 +566,7 @@ class FaceReconModel(nn.Module):
                 rgb_loss, depth_loss = torch.tensor(0), torch.tensor(0)
 
                 # Compute rgb loss
-                if self.rgb_camera_ids > 0:
+                if len(self.rgb_camera_ids) > 0:
                     color = color.reshape(color.shape[0], -1, 3)
                     color_pixel_mask = color_pixel_mask.reshape(color_pixel_mask.shape[0], -1)
                     color_pixel_mask *= input_rgb_pixel_mask
@@ -570,11 +575,11 @@ class FaceReconModel(nn.Module):
                     rgb_loss = rgb_loss * self.rgb_weight
 
                 # Compute depth loss
-                if self.depth_camera_ids > 0:
+                if len(self.depth_camera_ids > 0):
                     depth = depth[rgb_in_depth_masks]
                     depth = -depth.reshape(depth.shape[0], -1, 1)
 
-                    pixels_world_rendered = self._backproject_to_world_space(xys_cam, depth)
+                    pixels_world_rendered = self._backproject_to_world_space(xys_cam, depth, self.extrinsics)
                     normals_world_rendered = self._compute_normals_from_depth(
                         pixels_world_rendered.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
                     normals_world_rendered = normals_world_rendered.permute(0, 2, 3, 1).reshape(
@@ -623,214 +628,32 @@ class FaceReconModel(nn.Module):
                 scheduler.step()
 
         color = color.reshape(color.shape[0], *self.coarse2fine_resolutions[-1], 3)
-        if self.depth_camera_ids > 0:
+        if len(self.depth_camera_ids) > 0:
             depth = depth.reshape(depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
         input_rgb = input_rgb.reshape(input_rgb.shape[0], *self.coarse2fine_resolutions[-1], 3)
-        if self.depth_camera_ids > 0:
+        if len(self.depth_camera_ids) > 0:
             input_depth = input_depth.reshape(input_depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
 
         # Compute the mesh to scan loss
+        pixels_world_input, normals_world_input = self._get_input_fused_point_cloud(resolution, intrinsic, frame_features)
+        pixels_world = []
+        normals_world = []
+        for i in range(pixels_world_input.shape[0]):
+            pixels_world.append(pixels_world_input[i][input_depth_pixel_mask[i] > 0])
+            normals_world.append(normals_world_input[i][input_depth_pixel_mask[i] > 0])
+        
+        pixels_world_input = torch.concatenate(pixels_world)
+        normals_world_input = torch.concatenate(normals_world)
 
-
-        # increase the counter
-        self.counter += 1
-        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen
-
-    def optimize(
-        self,
-        frame_features: dict,
-        first_frame: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
-
-        for resolution, lr, opt_steps, cam2ndc, intrinsic in zip(self.coarse2fine_resolutions,
-                                                                 self.coarse2fine_lrs_first_frame if first_frame else self.coarse2fine_lrs_next_frames,
-                                                                 self.coarse2fine_opt_steps_first_frame if first_frame else self.coarse2fine_opt_steps_next_frames,
-                                                                 self.cam_to_ndc,
-                                                                 self.intrinsics):
-
-            # Process rgb and depth inputs
-            rgb_masks = torch.isin(frame_features["camera_id"], self.rgb_camera_ids)
-            depth_masks = torch.isin(frame_features["camera_id"], self.depth_camera_ids)
-            rgb_in_depth_masks = torch.isin(frame_features["camera_id"][rgb_masks], self.depth_camera_ids)
-            rgb_in_landmarks_masks = torch.isin(frame_features["camera_id"][rgb_masks], self.landmark_camera_id)
-
-            input_rgb = frame_features["image"][rgb_masks]
-            input_rgb_pixel_mask = frame_features["pixel_mask"][rgb_masks]
-            input_depth = frame_features["depth"][depth_masks]
-            input_depth_pixel_mask = frame_features["pixel_mask"][depth_masks]
-
-            input_rgb = input_rgb.float().to(self.device)
-            input_rgb_pixel_mask = input_rgb_pixel_mask.float().to(self.device)
-            input_depth = input_depth.float().to(self.device)
-            input_depth_pixel_mask = input_depth_pixel_mask.float().to(self.device)
-
-            input_rgb_combined = torch.concatenate([input_rgb, input_rgb_pixel_mask], dim=1)
-            input_depth_combined = torch.concatenate([input_depth, input_depth_pixel_mask], dim=1)
-
-            input_rgb_combined_resized = F.interpolate(input_rgb_combined, size=resolution).to(self.device)
-            input_depth_combined_resized = F.interpolate(input_depth_combined, size=resolution).to(self.device)
-
-            # Release GPU memory
-            del input_rgb, input_rgb_pixel_mask, input_depth, input_depth_pixel_mask, input_rgb_combined, input_depth_combined
-
-            input_rgb_combined_resized = input_rgb_combined_resized.permute(0, 2, 3, 1)
-            input_depth_combined_resized = input_depth_combined_resized.permute(0, 2, 3, 1)
-
-            input_rgb = input_rgb_combined_resized[..., :3].reshape(input_rgb_combined_resized.shape[0], -1, 3)
-            input_rgb_pixel_mask = input_rgb_combined_resized[..., -1].reshape(input_rgb_combined_resized.shape[0], -1)
-
-            input_depth = input_depth_combined_resized[..., :1].reshape(input_depth_combined_resized.shape[0], -1, 1)
-            input_depth_pixel_mask = input_depth_combined_resized[..., -1].reshape(input_depth_combined_resized.shape[0], -1)
-
-            # Process 2d landmarks
-            landmark_masks = torch.isin(frame_features["camera_id"], self.landmark_camera_id)
-            input_2d_landmarks = frame_features["predicted_landmark_2d"][landmark_masks].float().to(self.device)
-            input_2d_landmarks[:, :, 0] *= resolution[1] / self.orig_img_shape[1]
-            input_2d_landmarks[:, :, 1] *= resolution[0] / self.orig_img_shape[0]
-
-            # Get depth map with x, y coordinates
-            x_indices, y_indices = np.meshgrid(np.arange(resolution[1]), np.arange(resolution[0]))
-            x_indices = torch.from_numpy(x_indices.flatten()).to(self.device)[None, ...]
-            x_indices = torch.repeat_interleave(x_indices, input_depth_combined_resized.shape[0], 0)[..., None]
-            y_indices = torch.from_numpy(y_indices.flatten()).to(self.device)[None, ...]
-            y_indices = torch.repeat_interleave(y_indices, input_depth_combined_resized.shape[0], 0)[..., None]
-            xy_coordinates = torch.concatenate([x_indices, y_indices], dim=-1)
-
-            # Get 3D coordinates of input pixels in world space
-            xys_homo = torch.concatenate(
-                [xy_coordinates, torch.ones(xy_coordinates.shape[0], xy_coordinates.shape[1], 1).to(self.device)],
-                dim=-1)
-            xys_cam = torch.matmul(xys_homo, intrinsic)
-
-            pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth)
-            normals_world_input = self._compute_normals_from_depth(pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
-            normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
-
-            # Create optimizer
-            params = [self.exp_coeffs, self.pose_coeffs, self.tex_coeffs, self.transl_coeffs, self.light_coeffs,
-                      self.albedo, self.neck_pose_coeffs, self.eye_pose_coeffs]
-
-            if self.counter < self.shape_fitting_frames:
-                params.append(self.shape_coeffs)
-
-            optimizer = torch.optim.Adam(
-                [{'params': params}],
-                lr=lr,
-            )
-            scheduler = ExponentialLR(optimizer, gamma=0.999)
-
-            for _ in tqdm(range(opt_steps)):
-                # Get vertices in world space and compute vertices attributes
-                vertices_world, landmarks_68_world, landmarks_mp_world = self.face_model(
-                    shape_params=self.shape_coeffs,
-                    expression_params=self.exp_coeffs,
-                    pose_params=self.pose_coeffs,
-                    transl=self.transl_coeffs,
-                    neck_pose=self.neck_pose_coeffs,
-                    cameras_rot=self.cameras_rot[rgb_in_landmarks_masks],
-                    eye_pose=self.eye_pose_coeffs,
-                )
-
-                # Get vertices in camera space
-                vertices_cam, landmarks_68_cam, landmarks_mp_cam = self._project_to_cam_space(vertices_world, landmarks_68_world, landmarks_mp_world, self.world_to_cam)
-
-                # Get albedos from the texture model
-                albedos = (self.texture_model(self.tex_coeffs) / 255.0).permute(0, 2, 3, 1).contiguous()
-
-                # Get landmarks in screen space
-                vertices_ndc = self._project_to_ndc_space(vertices_cam, cam2ndc)
-
-                landmarks_68_ndc = self._project_to_ndc_space(landmarks_68_cam, cam2ndc)
-                landmarks_mp_ndc = self._project_to_ndc_space(landmarks_mp_cam, cam2ndc)
-                landmarks_68_ndc[:, :, 1] = -landmarks_68_ndc[:, :, 1]
-                landmarks_mp_ndc[:, :, 1] = -landmarks_mp_ndc[:, :, 1]
-                landmarks_68_screen = self._project_to_image_space(landmarks_68_ndc, resolution)[rgb_in_landmarks_masks]
-                landmarks_mp_screen = self._project_to_image_space(landmarks_mp_ndc, resolution)[rgb_in_landmarks_masks]
-
-                # Render images from different cameras
-                color, depth, depth_pixel_mask, color_pixel_mask = self._render(vertices_world, vertices_cam, vertices_ndc, albedos, resolution)
-                depth = depth[rgb_in_depth_masks]
-                color = color.reshape(color.shape[0], -1, 3)
-                depth = -depth.reshape(depth.shape[0], -1, 1)
-
-                pixels_world_rendered = self._backproject_to_world_space(xys_cam, depth)
-                normals_world_rendered = self._compute_normals_from_depth(pixels_world_rendered.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
-                normals_world_rendered = normals_world_rendered.permute(0, 2, 3, 1).reshape(normals_world_rendered.shape[0], -1, 3)
-
-                # Compute losses
-                landmarks_68_mask = torch.ones(landmarks_68_screen.shape[:2]).to(self.device)
-                depth_pixel_mask = depth_pixel_mask.reshape(depth_pixel_mask.shape[0], -1)
-                depth_pixel_mask *= input_depth_pixel_mask
-                num_valid_pixels_depth = (depth_pixel_mask > 0).sum(-1)
-
-                color_pixel_mask = color_pixel_mask.reshape(color_pixel_mask.shape[0], -1)
-                color_pixel_mask *= input_rgb_pixel_mask
-                num_valid_pixels_color = (color_pixel_mask > 0).sum(-1)
-
-                landmarks_68_loss = landmark_distance(input_2d_landmarks, landmarks_68_screen, landmarks_68_mask)
-                rgb_loss = pixel2pixel_distance(input_rgb, color, color_pixel_mask, num_valid_pixels_color)
-
-                if not self.use_chamfer:
-                    p2point_loss = point2point_distance(pixels_world_input, pixels_world_rendered, depth_pixel_mask,
-                                                        num_valid_pixels_depth, threshold=0.005)
-                    p2plane_loss = point2plane_distance(pixels_world_input, normals_world_input, pixels_world_rendered,
-                                                        normals_world_rendered, depth_pixel_mask, num_valid_pixels_depth, threshold=0.005)
-                    depth_loss = self.p2point_weight * p2point_loss + self.p2plane_weight * p2plane_loss
-                else:
-                    # Get the mesh
-                    mesh = Meshes(verts=vertices_world, faces=self.face_faces_only_face[None, ...])
-                    scan_to_mesh_loss, _ = scan_to_mesh_distance(pixels_world_input, normals_world_input,
-                                                                 *sample_points_from_meshes(mesh, num_samples=5000,
-                                                                                            return_normals=True), threshold=0.000025)
-                    scan_to_mesh_loss = torch.sqrt(scan_to_mesh_loss)
-                    depth_loss = self.chamfer_weight * scan_to_mesh_loss
-
-                loss = self.land_weight * landmarks_68_loss + \
-                       depth_loss + \
-                       self.rgb_weight * rgb_loss + \
-                       self.shape_reg_weight * self.shape_coeffs.norm(p=2, dim=1) + \
-                       self.eye_pose_coeffs.norm(p=2, dim=1) + \
-                       self.exp_reg_weight * self.exp_coeffs.norm(p=2, dim=1) + \
-                       self.tex_reg_weight * self.tex_coeffs.norm(p=2, dim=1)
-
-                print("landmark: ", self.land_weight * landmarks_68_loss)
-                print("depth: ", depth_loss)
-                print("rgb: ", self.rgb_weight * rgb_loss)
-                print("shape reg: ", self.shape_reg_weight * self.shape_coeffs.norm(p=2, dim=1))
-                print("eye pose reg: ", self.eye_pose_coeffs.norm(p=2, dim=1))
-                print("exp reg: ", self.exp_reg_weight * self.exp_coeffs.norm(p=2, dim=1))
-                print("tex reg: ", self.tex_reg_weight * self.tex_coeffs.norm(p=2, dim=1))
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
-
-        color = color.reshape(color.shape[0], *self.coarse2fine_resolutions[-1], 3)
-        depth = depth.reshape(depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
-        input_rgb = input_rgb.reshape(input_rgb.shape[0], *self.coarse2fine_resolutions[-1], 3)
-        input_depth = input_depth.reshape(input_depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
-
-        pixels_world_input_ = pixels_world_input[0][(depth_pixel_mask[0] > 0).flatten()]
-        normals_world_input_ = normals_world_input[0][(depth_pixel_mask[0] > 0).flatten()]
         mesh = Meshes(verts=vertices_world, faces=self.face_faces_only_face[None, ...])
-
-        scan_to_mesh_loss, _ = scan_to_mesh_distance(pixels_world_input_[None, ...], normals_world_input_[None, ...],
+        scan_to_mesh_loss, _ = scan_to_mesh_distance(pixels_world_input[None, ...], normals_world_input[None, ...],
                                                      *sample_points_from_meshes(mesh, num_samples=5000,
                                                                                 return_normals=True),
                                                      threshold=0.000025)
         scan_to_mesh_loss = torch.sqrt(scan_to_mesh_loss)
-        print("chamfer loss: ", scan_to_mesh_loss)
 
-        plotter = pv.Plotter()
-        plotter.set_background('white')
-        plotter.camera_position = 'xy'
-        plotter.add_mesh(pv.PolyData(pixels_world_input_.detach().cpu().numpy()), color='red')
-        plotter.add_mesh(pv.PolyData(vertices_world[0].detach().cpu().numpy(), np.concatenate((np.ones((self.faces.shape[0], 1)) * 3,
-                                             self.faces.cpu().numpy()), axis=-1).reshape(-1).astype(np.int64)), color='green')
-        plotter.camera.zoom(2.0)
-        plotter.show()
-        #plotter.screenshot(f'./output/3d/{self.counter}.png')
+        print("Scan to mesh loss: ", scan_to_mesh_loss)
+        # increase the counter
         self.counter += 1
+        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks
 
-        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen

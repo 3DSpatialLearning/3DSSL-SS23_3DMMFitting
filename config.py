@@ -240,7 +240,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--landmark_weight',
+    '--landmarks_68_weight',
     type=float,
     default=0.125,
     help='Landmark term weight'
