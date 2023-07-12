@@ -52,7 +52,7 @@ if __name__ == '__main__':
     extrinsic_matrices_optimization = first_frame_features["extrinsics"][rgb_camera_mask]
     intrinsic_matrices_optimization = first_frame_features["intrinsics"][rgb_camera_mask]
 
-    mesh_2_scan_camera_ids = config.depth_camera_ids
+    mesh_2_scan_camera_ids = config.scan_2_mesh_camera_ids
     mesh_2_scan_camera_mask = np.isin(first_frame_features["camera_id"], mesh_2_scan_camera_ids)
     extrinsic_matrices_fused_point_cloud = first_frame_features["extrinsics"][mesh_2_scan_camera_mask]
 

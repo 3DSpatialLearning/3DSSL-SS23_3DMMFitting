@@ -380,6 +380,7 @@ class FaceReconModel(nn.Module):
         resolution: Tuple[int, int],
         intrinsic: torch.Tensor,
         frame_features: dict,
+        rgb_in_depth_mask: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         # Get input depth data (pixels backprojected to world space and it's normals) and depth pixel mask
@@ -412,9 +413,10 @@ class FaceReconModel(nn.Module):
         xys_homo = torch.concatenate(
             [xy_coordinates, torch.ones(xy_coordinates.shape[0], xy_coordinates.shape[1], 1).to(self.device)],
             dim=-1)
-        xys_cam = torch.matmul(xys_homo, intrinsic)
 
-        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth, self.extrinsics)
+        xys_cam = torch.matmul(xys_homo, intrinsic[rgb_in_depth_mask])
+
+        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth, self.extrinsics[rgb_in_depth_mask])
         normals_world_input = self._compute_normals_from_depth(
             pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
         normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
@@ -426,7 +428,7 @@ class FaceReconModel(nn.Module):
         resolution: Tuple[int, int],
         intrinsic: torch.Tensor,
         frame_features: dict,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # Get input depth data (pixels backprojected to world space and it's normals) and depth pixel mask
         depth_masks = torch.isin(frame_features["camera_id"], self.scan_2_mesh_camera_ids)
 
@@ -464,7 +466,7 @@ class FaceReconModel(nn.Module):
             pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
         normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
 
-        return pixels_world_input, normals_world_input
+        return pixels_world_input, normals_world_input, input_depth_pixel_mask
 
     def _get_input_landmarks_data(
         self,
@@ -500,7 +502,8 @@ class FaceReconModel(nn.Module):
             if len(self.rgb_camera_ids) > 0:
                 input_rgb, input_rgb_pixel_mask = self._get_input_rgb_data(resolution, frame_features)
             if len(self.depth_camera_ids) > 0:
-                pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features)
+                print("Computing depth loss")
+                pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features, rgb_in_depth_masks)
                 if self.use_chamfer:
                     pixels_world = []
                     normals_world = []
@@ -576,15 +579,17 @@ class FaceReconModel(nn.Module):
 
                 # Compute depth loss
                 if len(self.depth_camera_ids > 0):
+                    print("Computing depth loss")
                     depth = depth[rgb_in_depth_masks]
                     depth = -depth.reshape(depth.shape[0], -1, 1)
 
-                    pixels_world_rendered = self._backproject_to_world_space(xys_cam, depth, self.extrinsics)
+                    pixels_world_rendered = self._backproject_to_world_space(xys_cam, depth, self.extrinsics[rgb_in_depth_masks])
                     normals_world_rendered = self._compute_normals_from_depth(
                         pixels_world_rendered.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
                     normals_world_rendered = normals_world_rendered.permute(0, 2, 3, 1).reshape(
                         normals_world_rendered.shape[0], -1, 3)
 
+                    depth_pixel_mask = depth_pixel_mask[rgb_in_depth_masks]
                     depth_pixel_mask = depth_pixel_mask.reshape(depth_pixel_mask.shape[0], -1)
                     depth_pixel_mask *= input_depth_pixel_mask
                     num_valid_pixels_depth = (depth_pixel_mask > 0).sum(-1)
@@ -635,7 +640,7 @@ class FaceReconModel(nn.Module):
             input_depth = input_depth.reshape(input_depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
 
         # Compute the mesh to scan loss
-        pixels_world_input, normals_world_input = self._get_input_fused_point_cloud(resolution, intrinsic, frame_features)
+        pixels_world_input, normals_world_input, input_depth_pixel_mask = self._get_input_fused_point_cloud(resolution, intrinsic[:len(self.scan_2_mesh_camera_ids)], frame_features)
         pixels_world = []
         normals_world = []
         for i in range(pixels_world_input.shape[0]):
