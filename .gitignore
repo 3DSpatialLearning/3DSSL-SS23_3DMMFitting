@@ -177,3 +177,5 @@ cython_debug/
 toy_example/runs
 
 !.gitkeep
+
+!models/PIPNET/lib

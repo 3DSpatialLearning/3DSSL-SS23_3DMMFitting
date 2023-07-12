@@ -25,7 +25,7 @@ class FaceReconModel(nn.Module):
     def __init__(
         self,
         face_model_config: argparse.Namespace,
-        orig_img_shape: tuple[int, int],
+        orig_img_shape: Tuple[int, int],
         device: str = "cuda",
     ):
         self.counter = 0
@@ -44,7 +44,8 @@ class FaceReconModel(nn.Module):
         self.depth_camera_ids = torch.tensor(face_model_config.depth_camera_ids)
         self.rgb_camera_ids = torch.tensor(face_model_config.rgb_camera_ids)
         self.landmark_camera_id = torch.tensor(face_model_config.landmark_camera_id)
-
+        self.scan_2_mesh_camera_ids = torch.tensor(face_model_config.scan_2_mesh_camera_ids)
+        
         # 3DMM parameters
         self.shape_coeffs = nn.Parameter(torch.zeros(1, face_model_config.shape_params).float())
         self.exp_coeffs = nn.Parameter(torch.zeros(1, face_model_config.expression_params).float())
@@ -134,7 +135,7 @@ class FaceReconModel(nn.Module):
         )
 
     ### Camera-related functions ###
-    def set_transformation_matrices(
+    def set_transformation_matrices_for_optimization(
         self,
         extrinsic_matrices: torch.Tensor,
         intrinsic_matrices: torch.Tensor,
@@ -179,6 +180,17 @@ class FaceReconModel(nn.Module):
             intrinsics = torch.stack(intrinsics).to(self.device)
             self.intrinsics.append(intrinsics)
 
+    def set_transformation_matrices_for_fused_point_cloud(
+        self,
+        extrinsic_matrices: torch.Tensor,
+    ) -> None:
+        self.extrinsics_fused_point_cloud = []
+
+        for extrinsic_matrix in extrinsic_matrices:
+            self.extrinsics_fused_point_cloud.append(extrinsic_matrix.t())
+
+        self.extrinsics_fused_point_cloud = torch.stack(self.extrinsics_fused_point_cloud).float().to(self.device)
+    
     def set_initial_pose(
         self,
         first_frame_features: dict
@@ -195,8 +207,8 @@ class FaceReconModel(nn.Module):
         not_nan_indices = ~(torch.isnan(input_landmarks).any(dim=-1))
         input_landmarks = input_landmarks[not_nan_indices]
 
-        for resolution, lr, opt_steps, cam2ndc in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs_first_frame,
-                                                      self.coarse2fine_opt_steps_first_frame, self.cam_to_ndc):
+        for _, lr, opt_steps, _ in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs_first_frame,
+                                       self.coarse2fine_opt_steps_first_frame, self.cam_to_ndc):
             # Create optimizer
             optimizer = torch.optim.Adam(
                 [{'params': [self.pose_coeffs, self.transl_coeffs]}],
@@ -272,7 +284,7 @@ class FaceReconModel(nn.Module):
     def _project_to_image_space(
         self,
         pixels_ndc: torch.Tensor,
-        resolution: tuple[int, int]
+        resolution: Tuple[int, int]
     ) -> torch.Tensor:
         pixels_screen = pixels_ndc[:, :, :2] / pixels_ndc[:, :, 2][..., None]
         pixels_screen[:, :, 0] = (pixels_screen[:, :, 0] + 1) * resolution[1] * 0.5
@@ -405,6 +417,50 @@ class FaceReconModel(nn.Module):
 
         return pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam
 
+    def _get_input_fused_point_cloud(
+        self,
+        resolution: Tuple[int, int],
+        intrinsic: torch.Tensor,
+        frame_features: dict,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        # Get input depth data (pixels backprojected to world space and it's normals) and depth pixel mask
+        depth_masks = torch.isin(frame_features["camera_id"], self.depth_camera_ids)
+
+        input_depth = frame_features["depth"][depth_masks]
+        input_depth_pixel_mask = frame_features["pixel_mask"][depth_masks]
+
+        input_depth = input_depth.float().to(self.device)
+        input_depth_pixel_mask = input_depth_pixel_mask.float().to(self.device)
+
+        input_depth_combined = torch.concatenate([input_depth, input_depth_pixel_mask], dim=1)
+        input_depth_combined_resized = F.interpolate(input_depth_combined, size=resolution).to(self.device)
+
+        del input_depth, input_depth_pixel_mask, input_depth_combined
+
+        input_depth = input_depth_combined_resized[..., :1].reshape(input_depth_combined_resized.shape[0], -1, 1)
+        input_depth_pixel_mask = input_depth_combined_resized[..., -1].reshape(input_depth_combined_resized.shape[0], -1)
+
+        # Get depth map with x, y coordinates
+        x_indices, y_indices = np.meshgrid(np.arange(resolution[1]), np.arange(resolution[0]))
+        x_indices = torch.from_numpy(x_indices.flatten()).to(self.device)[None, ...]
+        x_indices = torch.repeat_interleave(x_indices, input_depth_combined_resized.shape[0], 0)[..., None]
+        y_indices = torch.from_numpy(y_indices.flatten()).to(self.device)[None, ...]
+        y_indices = torch.repeat_interleave(y_indices, input_depth_combined_resized.shape[0], 0)[..., None]
+        xy_coordinates = torch.concatenate([x_indices, y_indices], dim=-1)
+
+        # Get 3D coordinates of input pixels in world space
+        xys_homo = torch.concatenate(
+            [xy_coordinates, torch.ones(xy_coordinates.shape[0], xy_coordinates.shape[1], 1).to(self.device)],
+            dim=-1)
+        xys_cam = torch.matmul(xys_homo, intrinsic)
+
+        pixels_world_input = self._backproject_to_world_space(xys_cam, input_depth)
+        normals_world_input = self._compute_normals_from_depth(
+            pixels_world_input.reshape(-1, resolution[0], resolution[1], 3).permute(0, 3, 1, 2))
+        normals_world_input = normals_world_input.permute(0, 2, 3, 1).reshape(normals_world_input.shape[0], -1, 3)
+
+        return pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam
+
     def _get_input_landmarks_data(
         self,
         resolution: Tuple[int, int],
@@ -441,8 +497,15 @@ class FaceReconModel(nn.Module):
             if self.depth_camera_ids > 0:
                 pixels_world_input, normals_world_input, input_depth, input_depth_pixel_mask, xys_cam = self._get_input_depth_data(resolution, intrinsic, frame_features)
                 if self.use_chamfer:
-                    input_depth_combined = torch.concatenate([input_depth, input_depth_pixel_mask], dim=1)
-                    input_depth_combined_resized = F.interpolate(input_depth_combined, size=resolution).to(self.device)
+                    pixels_world = []
+                    normals_world = []
+                    for i in range(pixels_world_input.shape[0]):
+                        pixels_world.append(pixels_world_input[i][input_depth_pixel_mask[i] > 0])
+                        normals_world.append(normals_world_input[i][input_depth_pixel_mask[i] > 0])
+                    
+                    pixels_world_input = torch.stack(pixels_world)
+                    normals_world_input = torch.stack(normals_world)
+
             input_2d_landmarks = self._get_input_landmarks_data(resolution, frame_features)
 
             # Create optimizer
