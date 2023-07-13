@@ -15,19 +15,7 @@ from models_.HairSegmenter import HairSegmenter
 from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 """
-  Multi-camera multi-frame FLAME fitting pipeline.
-  - data_dir: directory containing subfolders each correspoding to a camera data, with the following structure:
-    data_dir
-    ├── camera_1
-    │   ├── colmap_consistency/
-    │   ├── colmap_depth/
-    │   ├── colmap_normals/
-    │   ├── images/
-    │   ├── intrinsics.npy
-    │   └── extrinsics.npy
-    ├── camera_2
-      ...
-  - num_frames_for_shape_fitting (default: 1): number of frames to use for Flame shape fitting.
+  Generate the vertices and texture data needed to train MVP
 """
 
 if __name__ == '__main__':
@@ -109,7 +97,7 @@ if __name__ == '__main__':
     for frame_num, frame_features in enumerate(dataloader):
         frame_id = frame_features["frame_id"][0]
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        _, _, _, _, _, _, _, flame_vertices = face_recon_model.optimize(
+        _, _, _, _, _, _, _, _, flame_vertices = face_recon_model.optimize(
             frame_features, first_frame=frame_num == 0)
         flame_vertices = flame_vertices.detach().cpu().numpy().squeeze().astype(np.float32)
         bin_file_path = config.mesh_data_dir + f"/{frame_id}.bin"

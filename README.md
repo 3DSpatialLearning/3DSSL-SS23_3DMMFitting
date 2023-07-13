@@ -33,11 +33,9 @@ conda install -c fvcore -c iopath -c conda-forge fvcore iopath
 conda install pytorch3d -c pytorch3d
 
 # Compile the nms module of PIPnet
-cd models/PIPNET/FaceBoxesV2/utils
+cd models_/PIPNET/FaceBoxesV2/utils
 sh make.sh
 
 # Some package got overwritten, we need to uninstall them first
 pip uninstall numpy
 pip install numpy==1.23.1
-
-# export CUDA_HOME path

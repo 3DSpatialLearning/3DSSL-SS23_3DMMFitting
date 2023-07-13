@@ -1,3 +1,4 @@
+fire
 numpy==1.23.1
 tensorboard
 smplx

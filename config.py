@@ -4,6 +4,42 @@ import json
 
 parser = argparse.ArgumentParser(description='FLAME fitting config')
 
+#################### General settings ####################
+parser.add_argument(
+    '--experiment_name',
+    type=str,
+    default='test',
+    help='experiment name',
+)
+
+parser.add_argument(
+    '--output_frame_rate',
+    type=int,
+    default=24,
+    help='output frame rate'
+)
+
+parser.add_argument(
+    '--output_video_name',
+    type=str,
+    default='fitting.mp4',
+    help='output video name'
+)
+
+parser.add_argument(
+    '--workdir',
+    type=str,
+    default='output/',
+    help='workdir'
+)
+
+parser.add_argument(
+    '--draw_landmarks',
+    type=bool,
+    default=True,
+    help='If true draw landmarks on the output video'
+)
+
 #################### FLAME args ####################
 
 parser.add_argument(
