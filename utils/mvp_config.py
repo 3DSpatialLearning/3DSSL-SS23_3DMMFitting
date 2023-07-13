@@ -84,13 +84,13 @@ def get_autoencoder(dataset, renderoptions):
     """Return an autoencoder instance"""
     import torch
     import torch.nn as nn
-    import models_.mvp.models.volumetric as aemodel
-    import models_.mvp.models.encoders.geotex as encoderlib
-    import models_.mvp.models.decoders.mvp as decoderlib
-    import models_.mvp.models.raymarchers.mvpraymarcher as raymarcherlib
-    import models_.mvp.models.colorcals.colorcal as colorcalib
-    import models_.mvp.models.bg.lap as bglib
-    from models_.mvp.utils import utils
+    import models.mvp.models.volumetric as aemodel
+    import models.mvp.models.encoders.geotex as encoderlib
+    import models.mvp.models.decoders.mvp as decoderlib
+    import models.mvp.models.raymarchers.mvpraymarcher as raymarcherlib
+    import models.mvp.models.colorcals.colorcal as colorcalib
+    import models.mvp.models.bg.lap as bglib
+    from models.mvp.utils import utils
 
     allcameras = dataset.get_allcameras()
     ncams = len(allcameras)
@@ -256,8 +256,8 @@ class Eval():
     def get_ae_args(self): return dict(renderoptions={**get_renderoptions(),
         **self.otherargs})
     def get_dataset(self):
-        import models_.mvp.data.utils
-        import models_.mvp.data.camrotate as cameralib
+        import models.mvp.data.utils
+        import models.mvp.data.camrotate as cameralib
         if self.cam == "all":
             camerafilter = lambda x: x.startswith("40")
         elif self.cam == "holdout":
@@ -274,11 +274,11 @@ class Eval():
             camdataset = cameralib.Dataset(len(dataset), camdist=self.camdist,
                     period=self.camperiod, revs=self.camrevs,
                     **{k: v for k, v in self.otherargs.items() if k in cameralib.Dataset.__init__.__code__.co_varnames})
-            return models_.mvp.data.utils.ColCatDataset(camdataset, dataset)
+            return models.mvp.data.utils.ColCatDataset(camdataset, dataset)
         else:
             return dataset
     def get_writer(self):
-        import models_.mvp.utils.videowriter as writerlib
+        import models.mvp.utils.videowriter as writerlib
         if self.outfilename is None:
             outfilename = (
                     "render_{}_{}".format("-".join([x[:4].replace('_', '') for x in self.segments]), self.cam) +

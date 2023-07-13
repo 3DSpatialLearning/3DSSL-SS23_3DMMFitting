@@ -8,7 +8,7 @@ from typing import Optional, List
 import torch
 import torch.nn as nn
 
-from models_.mvp.models.utils import LinearELR, Conv2dELR, Downsample2d
+from models.mvp.models.utils import LinearELR, Conv2dELR, Downsample2d
 
 class Encoder(torch.nn.Module):
     def __init__(self, ninputs, size, nlayers=7, conv=Conv2dELR, lin=LinearELR):

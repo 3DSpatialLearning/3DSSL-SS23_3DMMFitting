@@ -13,8 +13,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import models_.mvp.models.utils
-from models_.mvp.models.utils import LinearELR, ConvTranspose2dELR, ConvTranspose3dELR
+import models.mvp.models.utils
+from models.mvp.models.utils import LinearELR, ConvTranspose2dELR, ConvTranspose3dELR
 
 @torch.jit.script
 def compute_postex(geo, idxim, barim, volradius : float):
@@ -445,7 +445,7 @@ class Decoder(nn.Module):
 
             # compose mesh transform with deltas
             primpos = primposmesh + primposdelta * 0.01
-            primrotdelta = models_.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.01)
+            primrotdelta = models.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.01)
             primrot = torch.bmm(
                     primrotmesh.view(-1, 3, 3),
                     primrotdelta.view(-1, 3, 3)).view(encoding.size(0), self.nprims, 3, 3)
@@ -463,7 +463,7 @@ class Decoder(nn.Module):
                 primscaledelta = primscaledelta * 0. + 1.
 
             primpos = primposdelta * 0.3
-            primrotdelta = models_.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.3)
+            primrotdelta = models.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.3)
             primrot = torch.exp(primrotdelta * 0.01)
             primscale = (self.scalemult * int(self.nprims ** (1. / 3))) * primscaledelta
 
@@ -609,7 +609,7 @@ class Decoder(nn.Module):
             blend = 3 * blend ** 2 - 2 * blend ** 3
 
             primpos = (1. - blend) * primpos0 + blend * primpos
-            primrot = models_.mvp.models.utils.rotation_interp(primrot0, primrot, blend)
+            primrot = models.mvp.models.utils.rotation_interp(primrot0, primrot, blend)
             primscale = torch.exp((1. - blend) * torch.log(primscale0) + blend * torch.log(primscale))
 
         losses = {}

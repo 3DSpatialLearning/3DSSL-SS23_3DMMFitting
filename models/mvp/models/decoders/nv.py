@@ -13,8 +13,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import models_.mvp.models.utils
-from models_.mvp.models.utils import LinearELR, ConvTranspose2dELR, ConvTranspose3dELR
+import models.mvp.models.utils
+from models.mvp.models.utils import LinearELR, ConvTranspose2dELR, ConvTranspose3dELR
 
 class Reshape(nn.Module):
     def __init__(self, *args):

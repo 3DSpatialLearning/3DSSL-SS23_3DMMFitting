@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from models_.mvp.models.utils import LinearELR, Conv2dELR
+from models.mvp.models.utils import LinearELR, Conv2dELR
 
 class Encoder(torch.nn.Module):
     def __init__(self, latentdim=256, hiq=True, texin=True,

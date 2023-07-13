@@ -23,7 +23,7 @@ import torch.nn.functional as F
 import torch.autograd.profiler as profiler
 
 from utils import utils
-from models_.mvp.models.utils import fuse, no_grad
+from models.mvp.models.utils import fuse, no_grad
 
 if __name__ == "__main__":
     # parse arguments

@@ -10,9 +10,9 @@ from config import get_config
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
 
-from models_.FaceReconstructionModel import FaceReconModel
-from models_.HairSegmenter import HairSegmenter
-from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
+from models.FaceReconstructionModel import FaceReconModel
+from models.HairSegmenter import HairSegmenter
+from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 """
   Generate the vertices and texture data needed to train MVP

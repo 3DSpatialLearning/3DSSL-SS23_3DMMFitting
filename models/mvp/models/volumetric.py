@@ -14,9 +14,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import models_.mvp.models.utils
+import models.mvp.models.utils
 
-from models_.mvp.extensions.utils.utils import compute_raydirs
+from models.mvp.extensions.utils.utils import compute_raydirs
 
 @torch.jit.script
 def compute_raydirs_ref(pixelcoords : torch.Tensor, viewrot : torch.Tensor, focal : torch.Tensor, princpt : torch.Tensor):

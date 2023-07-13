@@ -15,12 +15,12 @@ import torch.utils.data
 
 torch.backends.cudnn.benchmark = True
 
-from models_.mvp.utils import utils
+from models.mvp.utils import utils
 
 if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description='Train an autoencoder')
-    parser.add_argument('--experconfig', type=str, default='../utils_/mvp_config.py', help='experiment config file')
+    parser.add_argument('--experconfig', type=str, default='../utils/mvp_config.py', help='experiment config file')
     parser.add_argument('--profile', type=str, default='Train', help='config profile')
     parser.add_argument('--devices', type=int, nargs='+', default=[0], help='devices')
     parser.add_argument('--resume', action='store_true', help='resume training')

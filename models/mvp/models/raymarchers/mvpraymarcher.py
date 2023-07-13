@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models_.mvp.extensions.mvpraymarch.mvpraymarch import mvpraymarch
+from models.mvp.extensions.mvpraymarch.mvpraymarch import mvpraymarch
 
 class Raymarcher(nn.Module):
     def __init__(self, volradius):

@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import models_.mvp.models.utils
+import models.mvp.models.utils
 
 class ImageMod(nn.Module):
     def __init__(self, width, height, depth, buf=False):

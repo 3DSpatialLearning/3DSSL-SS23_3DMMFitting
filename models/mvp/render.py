@@ -21,7 +21,7 @@ import torch.utils.data
 import torch.profiler
 
 from utils import utils
-from models_.mvp.models.utils import fuse, no_grad
+from models.mvp.models.utils import fuse, no_grad
 
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')

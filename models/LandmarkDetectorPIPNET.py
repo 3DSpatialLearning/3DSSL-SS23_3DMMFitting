@@ -5,9 +5,9 @@ import os
 import torchvision.models as models
 import dlib
 
-from models_.PIPNET.FaceBoxesV2.faceboxes_detector import *
-from models_.PIPNET.lib.networks import *
-from models_.PIPNET.lib.functions import *
+from models.PIPNET.FaceBoxesV2.faceboxes_detector import *
+from models.PIPNET.lib.networks import *
+from models.PIPNET.lib.functions import *
 
 
 class LandmarkDetectorPIPENET(nn.Module):
@@ -17,7 +17,7 @@ class LandmarkDetectorPIPENET(nn.Module):
                  device: str = 'cuda'
     ):
         super(LandmarkDetectorPIPENET, self).__init__()
-        config_path = 'models_.PIPNET.experiments.{}.{}'.format(source_format, experiment)
+        config_path = 'models.PIPNET.experiments.{}.{}'.format(source_format, experiment)
         config = importlib.import_module(config_path, package='PIPNet')
         Config = getattr(config, 'Config')
         self.cfg = Config()

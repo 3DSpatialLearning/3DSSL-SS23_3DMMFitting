@@ -1,5 +1,5 @@
-from utils_.data import load_data
-from utils_.fitting import fit_flame_model_to_input_point_cloud
+from utils.data import load_data
+from utils.fitting import fit_flame_model_to_input_point_cloud
 from config import get_config
 import os
 
