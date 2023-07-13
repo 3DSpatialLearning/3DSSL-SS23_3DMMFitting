@@ -174,14 +174,16 @@ cython_debug/
 *.tflite
 
 # ignore mvp data
+/data/experiments
 *.bin
 vert_var.txt
 tex_var.txt
 
 
 # ignore logs
+/output
 /runs
-toy_example/runs
+example/runs
 
 # keep folders
 !.gitkeep
