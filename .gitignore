@@ -172,11 +172,17 @@ cython_debug/
 *.dat
 *.tflite
 
+# ignore mvp data
+*.bin
+vert_var.txt
+tex_var.txt
+
+
 # ignore logs
 /runs
 toy_example/runs
 
+# keep folders
 !.gitkeep
-
 !models_/PIPNET/lib
 !data/checkpoints/pipnet/data_300W_COFW_WFLW/pip_32_16_60_r18_l2_l1_10_1_nb10_wcc/epoch59.pth

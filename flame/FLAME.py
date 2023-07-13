@@ -165,7 +165,7 @@ class FLAME(nn.Module):
 
     def _find_dynamic_lmk_idx_and_bcoords(self, vertices, pose, dynamic_lmk_faces_idx,
                                           dynamic_lmk_b_coords,
-                                          neck_kin_chain, cameras_rot, dtype=torch.float32):
+                                          neck_kin_chain, cameras_rot=None, dtype=torch.float32):
         """
             Selects the face contour depending on the reletive position of the head
             Input:
@@ -192,7 +192,8 @@ class FLAME(nn.Module):
         for idx in range(len(neck_kin_chain)):
             rel_rot_mat = torch.bmm(rot_mats[:, idx], rel_rot_mat)
 
-        rel_rot_mat = cameras_rot @ rel_rot_mat # Different views need to be considered
+        if cameras_rot is not None:
+            rel_rot_mat = cameras_rot @ rel_rot_mat # Different views need to be considered
 
         y_rot_angle = torch.round(
             torch.clamp(-rot_mat_to_euler(rel_rot_mat) * 180.0 / np.pi,

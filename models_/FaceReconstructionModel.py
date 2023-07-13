@@ -134,6 +134,20 @@ class FaceReconModel(nn.Module):
                 face_model_config.coarse2fine_resolutions)
         )
 
+    def get_flame(self):
+        vertices_world, _, _ = self.face_model(
+            shape_params=self.shape_coeffs,
+            expression_params=self.exp_coeffs,
+            pose_params=self.pose_coeffs,
+            transl=self.transl_coeffs,
+            neck_pose=self.neck_pose_coeffs,
+            eye_pose=self.eye_pose_coeffs,
+        )
+        vertices_world = vertices_world.detach().cpu().numpy().squeeze()
+        faces = self.face_model.faces.squeeze()
+        uvcoords = self.uvcoords.detach().cpu().numpy().squeeze()
+        return vertices_world, faces, uvcoords
+
     ### Camera-related functions ###
     def set_transformation_matrices_for_optimization(
         self,
@@ -578,7 +592,6 @@ class FaceReconModel(nn.Module):
 
                 # Compute depth loss
                 if len(self.depth_camera_ids > 0):
-                    print("Computing depth loss")
                     depth = depth[rgb_in_depth_masks]
                     depth = -depth.reshape(depth.shape[0], -1, 1)
 
@@ -656,8 +669,7 @@ class FaceReconModel(nn.Module):
                                                      threshold=0.000025)
         scan_to_mesh_loss = torch.sqrt(scan_to_mesh_loss)
 
-        print("Scan to mesh loss: ", scan_to_mesh_loss)
         # increase the counter
         self.counter += 1
-        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks
+        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, vertices_world
 

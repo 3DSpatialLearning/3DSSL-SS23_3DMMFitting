@@ -106,6 +106,7 @@ class CameraFrameDataset(Dataset):
             "intrinsics": np.load(os.path.join(path, self.intrinsics_filename)),
             "extrinsics": np.load(os.path.join(path, self.extrinsics_filename)),
             "camera_id": int(cam_folder),
+            "frame_id": frame_id
         }
 
         if self.has_predicted_landmarks:
