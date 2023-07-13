@@ -43,8 +43,7 @@ ext_modules = [
     Extension(
         "nms.cpu_nms",
         ["nms/cpu_nms.pyx"],
-        # extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},
-        extra_compile_args=[],
+        extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},   # comment this line if you're using Windows
         include_dirs=[numpy_include]
     )
 ]
