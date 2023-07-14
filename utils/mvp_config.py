@@ -1,5 +1,5 @@
 import os
-import dataset.MvpDataset as datamodel
+import models.mvp.data.multiviewvideo as datamodel
 
 import numpy as np
 
@@ -62,7 +62,8 @@ def get_dataset(
         baseposepath=baseposepath,
         camerafilter=camerafilter,
         segmentfilter=segmentfilter,
-        keyfilter=["bg", "camera", "modelmatrix", "modelmatrixinv", "pixelcoords", "image", "avgtex", "verts"] + keyfilter,
+        keyfilter=["bg", "camera", "modelmatrix", "modelmatrixinv", "pixelcoords", "image", "verts"] + keyfilter,
+        # keyfilter=["bg", "camera", "modelmatrix", "modelmatrixinv", "pixelcoords", "image", "avgtex", "verts"] + keyfilter,
         maxframes=maxframes,
         subsampletype=subsampletype,
         subsamplesize=384,
@@ -112,7 +113,7 @@ def get_autoencoder(dataset, renderoptions):
     vertmean = torch.from_numpy(dataset.vertmean)
     vertstd = dataset.vertstd
 
-    encoder = encoderlib.Encoder(texsize=256)
+    encoder = encoderlib.Encoder(texin=False, texsize=256)
     print("encoder:", encoder)
 
     volradius = 256.
@@ -152,7 +153,8 @@ def get_autoencoder(dataset, renderoptions):
         colorcal,
         volradius,
         bgmodel,
-        encoderinputs=["verts", "avgtex"],
+        encoderinputs=["verts"],
+        # encoderinputs=["verts", "avgtex"],
         topology={"vt": vt, "vi": vi, "vti": vti},
         imagemean=100.,
         imagestd=25.)
@@ -203,7 +205,7 @@ class Train():
 
 class ProgressWriter():
     def batch(self, iternum, itemnum, **kwargs):
-        print("batch", iternum, itemnum, kwargs.keys())
+        print(kwargs["irgbrec"].shape)
         import numpy as np
         from PIL import Image
         rows = []

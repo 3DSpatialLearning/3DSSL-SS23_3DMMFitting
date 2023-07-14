@@ -6,13 +6,12 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.transforms import Compose as TransformCompose
 
 from config import get_config
-
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
-
 from models.FaceReconstructionModel import FaceReconModel
 from models.HairSegmenter import HairSegmenter
 from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
+from utils.transform import backproject_points, rigid_transform_3d
 
 """
   Generate the vertices and texture data needed to train MVP
@@ -67,7 +66,6 @@ if __name__ == '__main__':
     # compute the initial alignment
     face_recon_model.set_initial_pose(first_frame_features)
 
-
     # save .obj file
     obj_file_path = config.mesh_data_dir + "/flame.obj"
     Path(obj_file_path).parent.mkdir(parents=True, exist_ok=True)
@@ -94,8 +92,29 @@ if __name__ == '__main__':
             counter += 3
 
     sequence_verts = []
+    first_frame_point_cloud = None
+    not_nan_indices_1 = None
     for frame_num, frame_features in enumerate(dataloader):
         frame_id = frame_features["frame_id"][0]
+
+        # save head pose transform wrt first frame
+        head_transform_file_path = config.mesh_data_dir + f"/{frame_id}_transform.txt"
+        head_transform = np.eye(4)
+        if frame_num == 0:
+            first_frame_point_cloud = frame_features["predicted_landmark_3d"][0].numpy()
+            not_nan_indices_1 = ~(np.isnan(first_frame_point_cloud).any(axis=1))
+        else:
+            frame_point_cloud = frame_features["predicted_landmark_3d"][0].numpy()
+            not_nan_indices = ~(np.isnan(frame_point_cloud).any(axis=1))
+            not_nan_indices = np.logical_and(not_nan_indices_1, not_nan_indices)
+            source = first_frame_point_cloud[not_nan_indices].T
+            target = frame_point_cloud[not_nan_indices].T
+            r, t = rigid_transform_3d(source, target)
+            head_transform[:3, :3] = r
+            head_transform[:3, 3] = t.squeeze()
+        np.savetxt(head_transform_file_path, head_transform)
+
+        # save mesh vertices
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
         _, _, _, _, _, _, _, _, flame_vertices = face_recon_model.optimize(
             frame_features, first_frame=frame_num == 0)

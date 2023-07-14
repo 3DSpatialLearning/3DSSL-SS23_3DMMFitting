@@ -166,7 +166,7 @@ class CameraFrameDataset(Dataset):
 
                     camera_intrinsics = np.load(os.path.join(path_to_cam_folder, self.intrinsics_filename))
                     camera_extrinsics = np.load(os.path.join(path_to_cam_folder, self.extrinsics_filename))
-                    landmark_3d = backproject_points(landmark_2d, depth, camera_intrinsics, camera_extrinsics)
+                    landmark_3d = backproject_points(depth, camera_intrinsics, camera_extrinsics, points=landmark_2d)
 
                     # clear low consistency landmarks
                     landmark_3d[landmark_3d[:, 2] == 0] = [np.nan, np.nan, np.nan]

@@ -176,6 +176,7 @@ cython_debug/
 # ignore mvp data
 /data/experiments
 *.bin
+*transform.txt
 vert_var.txt
 tex_var.txt
 
