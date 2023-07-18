@@ -17,6 +17,8 @@ torch.backends.cudnn.benchmark = True
 
 from models.mvp.utils import utils
 
+# torch.autograd.set_detect_anomaly(True)
+
 if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description='Train an autoencoder')
@@ -148,7 +150,7 @@ if __name__ == "__main__":
             optim.step()
 
             # compute evaluation output
-            if not args.noprogress and iternum in evalpoints:
+            if iternum == 0 or (not args.noprogress and iternum in evalpoints):
                 with torch.no_grad():
                     testoutput, _ = ae(
                             trainiter=iternum,
@@ -178,6 +180,7 @@ if __name__ == "__main__":
                 break
 
             iternum += 1
+            # exit(0)
 
         if iternum >= profile.maxiter:
             break

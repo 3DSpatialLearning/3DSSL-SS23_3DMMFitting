@@ -18,7 +18,7 @@ import torch
 import torch.utils.data
 torch.backends.cudnn.benchmark = True # gotta go fast!
 
-from utils import utils
+from models.mvp.utils import utils
 
 if __name__ == "__main__":
     # parse arguments

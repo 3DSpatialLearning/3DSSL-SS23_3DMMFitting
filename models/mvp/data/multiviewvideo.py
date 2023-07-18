@@ -74,7 +74,8 @@ class Dataset(torch.utils.data.Dataset):
             downsample : float=1.,
             blacklevel : list=[0., 0., 0.],
             maskbright : bool=False,
-            maskbrightbg : bool=False
+            maskbrightbg : bool=False,
+            img_size: np.array = None,
             ):
         """
         Dataset class for loading synchronized multi-view video (optionally
@@ -191,7 +192,8 @@ class Dataset(torch.utils.data.Dataset):
             self.camrot[cam] = (krt[cam]['extrin'][:3, :3]).astype(np.float32)
             self.focal[cam] = (np.diag(krt[cam]['intrin'][:2, :2]) / downsample).astype(np.float32)
             self.princpt[cam] = (krt[cam]['intrin'][:2, 2] / downsample).astype(np.float32)
-            self.size[cam] = np.floor(krt[cam]['size'].astype(np.float32) / downsample).astype(np.int32)
+            size = img_size if img_size is not None else krt[cam]['size']
+            self.size[cam] = np.floor(size.astype(np.float32) / downsample).astype(np.int32)
 
         # set up paths
         self.imagepath = imagepath

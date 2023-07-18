@@ -4,7 +4,6 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 """Dataset class for multiview video datasets"""
-import itertools
 import multiprocessing
 import os
 from typing import Optional, Callable
@@ -21,6 +20,27 @@ import cv2
 cv2.setNumThreads(0)
 
 from models.mvp.utils import utils
+
+def load_camera_info_from_capturepath(capturepath: str, conversion_matrix: np.array = np.eye(3), scale: float = 1.0):
+    cameras = {}
+    list_of_cam_folders = os.listdir(capturepath)
+    list_of_cam_folders = [folder for folder in list_of_cam_folders if folder != '.gitkeep']
+    for cam_folder in list_of_cam_folders:
+        extrinsics_path = os.path.join(capturepath, cam_folder, 'extrinsics.npy')
+        intrinsics_path = os.path.join(capturepath, cam_folder, 'intrinsics.npy')
+        dist = np.array([0, 0, 0, 0, 0]).astype(np.float32)
+        extrin = np.load(extrinsics_path)
+        extrin = np.linalg.inv(extrin)  # c2w -> w2c
+        # extrin = conversion_matrix @ extrin[:3, :4]
+        # extrin[1:3, :3] *= -1
+        extrin[:3, 3] *= scale
+        intrin = np.load(intrinsics_path)
+        cameras[cam_folder] = {
+            "intrin": intrin,
+            "dist": dist,
+            "extrin": extrin
+        }
+    return cameras
 
 class ImageLoader:
     def __init__(self, bgpath, blacklevel):
@@ -46,18 +66,14 @@ class ImageLoader:
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self,
-            krtpath : str,
             geomdir : str,
-            imagepath : str,
+            capturepath : str,
             keyfilter : list,
             camerafilter : Callable[[str], bool],
-            segmentfilter : Callable[[str], bool]=lambda x: True,
             framelist : Optional[list]=None,
-            frameexclude : list=[],
             maxframes : int=-1,
             bgpath : Optional[str]=None,
             returnbg : bool=False,
-            baseposesegframe : tuple=None,
             baseposepath : Optional[str]=None,
             fixedcameras : list=[],
             fixedframesegframe : Optional[tuple]=None,
@@ -68,7 +84,6 @@ class Dataset(torch.utils.data.Dataset):
             standardizeavgtex : bool=True,
             standardizetex : bool=False,
             avgtexsize : int=1024,
-            texsize : int=1024,
             subsampletype : Optional[str]=None,
             subsamplesize : int=0,
             downsample : float=1.,
@@ -76,6 +91,8 @@ class Dataset(torch.utils.data.Dataset):
             maskbright : bool=False,
             maskbrightbg : bool=False,
             img_size: np.array = None,
+            convention: str = "opencv",
+            scale: float = 1.0
             ):
         """
         Dataset class for loading synchronized multi-view video (optionally
@@ -83,14 +100,9 @@ class Dataset(torch.utils.data.Dataset):
 
         Parameters
         ----------
-        krtpath : str,
-            path to KRT file. See utils.utils.load_krt docstring for details
         geomdir : str,
             base path to geometry data (tracked meshes, unwrapped textures,
             rigid transforms)
-        imagepath : str,
-            path to images. should be a string that accepts "seg", "cam", and
-            "frame" format keys (e.g., "data/{seg}/{cam}/{frame}.png")
         keyfilter : list,
             list of items to load and return (e.g., images, textures, vertices)
             available in this dataset:
@@ -160,6 +172,11 @@ class Dataset(torch.utils.data.Dataset):
             True to not include bright pixels in loss
         maskbrightbg : bool,
             True to not include bright background pixels in loss
+        img_size: np.array,
+            size of the image
+        convention: str,
+            convention of the camera matrix, mvp expects opencv convention, if other convention is used,
+            the coordinates will be flipped
         """
         # options
         self.keyfilter = keyfilter
@@ -179,35 +196,42 @@ class Dataset(torch.utils.data.Dataset):
         self.maskbright = maskbright
         self.maskbrightbg = maskbrightbg
 
-        # compute camera/frame list
-        krt = utils.load_krt(krtpath)
+        self.conversion_matrix = np.eye(3)
+        if convention == "opengl":
+            self.conversion_matrix[1, 1] = -1
+            self.conversion_matrix[2, 2] = -1
+        self.scale = scale
 
-        self.allcameras = sorted(list(krt.keys()))
+        # compute camera/frame list
+        camera_info = load_camera_info_from_capturepath(capturepath, conversion_matrix=self.conversion_matrix, scale=self.scale)
+
+        self.allcameras = sorted(list(camera_info.keys()))
         self.cameras = list(filter(camerafilter, self.allcameras))
 
         # compute camera positions
         self.campos, self.camrot, self.focal, self.princpt, self.size = {}, {}, {}, {}, {}
         for cam in self.allcameras:
-            self.campos[cam] = (-np.dot(krt[cam]['extrin'][:3, :3].T, krt[cam]['extrin'][:3, 3])).astype(np.float32)
-            self.camrot[cam] = (krt[cam]['extrin'][:3, :3]).astype(np.float32)
-            self.focal[cam] = (np.diag(krt[cam]['intrin'][:2, :2]) / downsample).astype(np.float32)
-            self.princpt[cam] = (krt[cam]['intrin'][:2, 2] / downsample).astype(np.float32)
-            size = img_size if img_size is not None else krt[cam]['size']
+            self.campos[cam] = (-np.dot(camera_info[cam]['extrin'][:3, :3].T, camera_info[cam]['extrin'][:3, 3])).astype(np.float32)
+            self.camrot[cam] = (camera_info[cam]['extrin'][:3, :3]).astype(np.float32)
+            self.focal[cam] = (np.diag(camera_info[cam]['intrin'][:2, :2]) / downsample).astype(np.float32)
+            self.princpt[cam] = (camera_info[cam]['intrin'][:2, 2] / downsample).astype(np.float32)
+            size = img_size if img_size is not None else camera_info[cam]['size']
             self.size[cam] = np.floor(size.astype(np.float32) / downsample).astype(np.int32)
 
         # set up paths
-        self.imagepath = imagepath
+        self.imagepath = os.path.join(capturepath, "{cam}", "images", "{frame:05d}.png")
+        self.bg_image_path = os.path.join(capturepath, "{cam}", "background", "{frame:05d}.png")
         if geomdir is not None:
-            self.vertpath = os.path.join(geomdir, "tracked_mesh", "{seg}", "{frame:06d}.bin")
-            self.transfpath = os.path.join(geomdir, "tracked_mesh", "{seg}", "{frame:06d}_transform.txt")
-            self.texpath = os.path.join(geomdir, "unwrapped_uv_1024", "{seg}", "{cam}", "{frame:06d}.png")
+            self.vertpath = os.path.join(geomdir, "{frame:05d}.bin")
+            self.transfpath = os.path.join(geomdir, "{frame:05d}_transform.txt")
+            self.texpath = os.path.join(geomdir, "{frame:05d}.png")
         else:
             self.transfpath = None
 
         # build list of frames
         if framelist is None:
-            framelist = np.genfromtxt(os.path.join(geomdir, "frame_list.txt"), dtype=np.str)
-            self.framelist = [tuple(sf) for sf in framelist if segmentfilter(sf[0]) and sf[1] not in frameexclude]
+            list_of_frame_ids = sorted(os.listdir(os.path.join(capturepath, self.allcameras[0], "images")))
+            self.framelist = [os.path.splitext(file)[0] for file in list_of_frame_ids if ".png" in file]
         else:
             self.framelist = framelist
 
@@ -227,30 +251,19 @@ class Dataset(torch.utils.data.Dataset):
         # set base pose
         if baseposepath is not None:
             self.basetransf = np.genfromtxt(baseposepath, max_rows=3).astype(np.float32)
-        elif baseposesegframe is not None:
-            self.basetransf = np.genfromtxt(self.transfpath.format(
-                seg=baseposesegframe[0],
-                frame=baseposesegframe[1])).astype(np.float32)
         else:
             raise Exception("base transformation must be provided")
 
         # load normstats
-        if "avgtex" in keyfilter or "tex" in keyfilter:
+        if "avgtex" in keyfilter:
             texmean = np.asarray(Image.open(os.path.join(geomdir, "tex_mean.png")), dtype=np.float32)
             self.texstd = float(np.genfromtxt(os.path.join(geomdir, "tex_var.txt")) ** 0.5)
-
-        if "avgtex" in keyfilter:
             self.avgtexsize = avgtexsize
             avgtexmean = texmean
             if avgtexmean.shape[0] != self.avgtexsize:
-                avgtexmean = cv2.resize(avgtexmean, dsize=(self.avgtexsize, self.avgtexsize), interpolation=cv2.INTER_LINEAR)
+                avgtexmean = cv2.resize(avgtexmean, dsize=(self.avgtexsize, self.avgtexsize),
+                                        interpolation=cv2.INTER_LINEAR)
             self.avgtexmean = avgtexmean.transpose((2, 0, 1)).astype(np.float32).copy("C")
-
-        if "tex" in keyfilter:
-            self.texsize = texsize
-            if texmean.shape[0] != self.texsize:
-                texmean = cv2.resize(texmean, dsize=self.texsize, interpolation=cv2.INTER_LINEAR)
-            self.texmean = texmean.transpose((2, 0, 1)).astype(np.float32).copy("C")
 
         if "verts" in keyfilter:
             self.vertmean = np.fromfile(os.path.join(geomdir, "vert_mean.bin"), dtype=np.float32).reshape((-1, 3))
@@ -292,54 +305,19 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.framecamlist)
 
     def __getitem__(self, idx):
-        (seg, frame), cam = self.framecamlist[idx]
-
+        frame, cam = self.framecamlist[idx]
         result = {}
 
-        result["segid"] = seg
         result["frameid"] = frame
         if cam is not None:
             result["cameraid"] = cam
 
         validinput = True
 
-        # image from one or more cameras (those cameras are fixed over the dataset)
-        if "fixedcamimage" in self.keyfilter:
-            ninput = len(self.fixedcameras)
-
-            fixedcamimage = []
-            for i in range(ninput):
-                imagepath = self.imagepath.format(seg=seg, cam=self.fixedcameras[i], frame=int(frame))
-                image = utils.downsample(
-                        np.asarray(Image.open(imagepath), dtype=np.uint8), self.fixedcamdownsample).transpose((2, 0, 1)).astype(np.float32)
-                fixedcamimage.append(image)
-            fixedcamimage = np.concatenate(fixedcamimage, axis=1)
-            fixedcamimage[:] -= self.fixedcammean
-            fixedcamimage[:] /= self.fixedcamstd
-            result["fixedcamimage"] = fixedcamimage
-
-        # image from one or more cameras, always the same frame
-        if "fixedframeimage" in self.keyfilter:
-            ninput = len(self.fixedcameras)
-
-            fixedframeimage = []
-            for i in range(ninput):
-                imagepath = self.imagepath.format(
-                        seg=self.fixedframesegframe[0],
-                        cam=self.fixedcameras[i],
-                        frame=int(self.fixedframesegframe[1]))
-                image = utils.downsample(
-                        np.asarray(Image.open(imagepath), dtype=np.uint8), self.fixedcamdownsample).transpose((2, 0, 1)).astype(np.float32)
-                fixedframeimage.append(image)
-            fixedframeimage = np.concatenate(fixedframeimage, axis=1)
-            fixedframeimage[:] -= self.fixedcammean
-            fixedframeimage[:] /= self.fixedcamstd
-            result["fixedframeimage"] = fixedframeimage
-
         # vertices
         for k in ["verts", "verts_next"]:
             if k in self.keyfilter:
-                vertpath = self.vertpath.format(seg=seg, frame=int(frame) + (1 if k == "verts_next" else 0))
+                vertpath = self.vertpath.format(frame=int(frame) + (1 if k == "verts_next" else 0))
                 verts = np.fromfile(vertpath, dtype=np.float32)
                 if self.standardizeverts:
                     verts -= self.vertmean.ravel()
@@ -349,7 +327,7 @@ class Dataset(torch.utils.data.Dataset):
         # texture averaged over all cameras for a single frame
         for k in ["avgtex", "avgtex_next"]:
             if k in self.keyfilter:
-                texpath = self.texpath.format(seg=seg, cam="average", frame=int(frame) + (1 if k == "avgtex_next" else 0))
+                texpath = self.texpath.format(frame=int(frame) + (1 if k == "avgtex_next" else 0))
                 try:
                     tex = np.asarray(Image.open(texpath), dtype=np.uint8)
                     if tex.shape[0] != self.avgtexsize:
@@ -378,9 +356,9 @@ class Dataset(torch.utils.data.Dataset):
             for k in ["modelmatrix", "modelmatrix_next"]:
                 if k in self.keyfilter:
                     if self.transfpath is not None:
-                        transfpath = self.transfpath.format(seg=seg, frame=int(frame) + (1 if k == "modelmatrix_next" else 0))
+                        transfpath = self.transfpath.format(frame=int(frame) + (1 if k == "modelmatrix_next" else 0))
                         try:
-                            frametransf = np.genfromtxt(os.path.join(transfpath)).astype(np.float32)
+                            frametransf = np.genfromtxt(os.path.join(transfpath), max_rows=3).astype(np.float32)
                         except:
                             frametransf = None
 
@@ -394,9 +372,9 @@ class Dataset(torch.utils.data.Dataset):
             for k in ["modelmatrixinv", "modelmatrixinv_next"]:
                 if k in self.keyfilter:
                     if self.transfpath is not None:
-                        transfpath = self.transfpath.format(seg=seg, frame=int(frame) + (1 if k == "modelmatrixinv_next" else 0))
+                        transfpath = self.transfpath.format(frame=int(frame) + (1 if k == "modelmatrixinv_next" else 0))
                         try:
-                            frametransf = np.genfromtxt(os.path.join(transfpath)).astype(np.float32)
+                            frametransf = np.genfromtxt(os.path.join(transfpath), max_rows=3).astype(np.float32)
                         except:
                             frametransf = None
 
@@ -416,30 +394,20 @@ class Dataset(torch.utils.data.Dataset):
                 result["princpt"] = self.princpt[cam]
                 result["camindex"] = self.allcameras.index(cam)
 
-            # per-frame / per-camera unwrapped texture map
-            if "tex" in self.keyfilter:
-                texpath = self.texpath.format(seg=seg, cam=cam, frame=frame)
-                try:
-                    tex = np.asarray(Image.open(texpath), dtype=np.uint8).transpose((2, 0, 1)).astype(np.float32)
-                except:
-                    tex = np.zeros((3, self.texsize, self.texsize), dtype=np.float32)
-
-                assert tex.shape[1] == self.texsize
-                texmask = np.sum(tex, axis=0) != 0
-                if self.standardizetex:
-                    tex -= self.texmean
-                    tex /= self.texstd
-                    tex[:, ~texmask] = 0.
-                result["tex"] = tex
-                result["texmask"] = texmask
 
             # camera images
             if "image" in self.keyfilter:
                 # target image
-                imagepath = self.imagepath.format(seg=seg, cam=cam, frame=int(frame))
+                imagepath = self.imagepath.format(cam=cam, frame=int(frame))
                 image = utils.downsample(
                         np.asarray(Image.open(imagepath), dtype=np.uint8),
                         self.downsample).transpose((2, 0, 1)).astype(np.float32)
+                bg_image_path = self.bg_image_path.format(cam=cam, frame=int(frame))
+                background = utils.downsample(
+                        np.asarray(Image.open(bg_image_path), dtype=np.uint8),
+                        self.downsample).transpose((2, 0, 1)).astype(np.float32)
+                background = background > 0
+                image = image * background
                 height, width = image.shape[1:3]
                 valid = np.float32(1.0) if np.sum(image) != 0 else np.float32(0.)
 

@@ -11,13 +11,16 @@ from dataset.transforms import ToTensor
 from models.FaceReconstructionModel import FaceReconModel
 from models.HairSegmenter import HairSegmenter
 from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
-from utils.transform import backproject_points, rigid_transform_3d
+from utils.transform import rigid_transform_3d
 
 """
   Generate the vertices and texture data needed to train MVP
 """
 
 if __name__ == '__main__':
+    # openGL -> openCV coordinate system
+    scale = 1000.
+
     config = get_config(path_to_data_dir="../")
 
     # data loading
@@ -63,13 +66,11 @@ if __name__ == '__main__':
         extrinsic_matrices=extrinsic_matrices_fused_point_cloud,
     )
 
-    # compute the initial alignment
-    face_recon_model.set_initial_pose(first_frame_features)
-
     # save .obj file
     obj_file_path = config.mesh_data_dir + "/flame.obj"
     Path(obj_file_path).parent.mkdir(parents=True, exist_ok=True)
-    vertices, faces, uv_coords = face_recon_model.get_flame()
+    vertices, landmarks, faces, uv_coords = face_recon_model.get_flame()
+    vertices = vertices * scale
 
     face_verts_uv_coords = []
     for face in faces:
@@ -92,41 +93,48 @@ if __name__ == '__main__':
             counter += 3
 
     sequence_verts = []
-    first_frame_point_cloud = None
-    not_nan_indices_1 = None
+    reference_landmarks = landmarks
+
+    face_recon_model.set_initial_pose(first_frame_features)
     for frame_num, frame_features in enumerate(dataloader):
+        print(f"Processing frame {frame_num}/{len(dataloader)}")
         frame_id = frame_features["frame_id"][0]
 
-        # save head pose transform wrt first frame
-        head_transform_file_path = config.mesh_data_dir + f"/{frame_id}_transform.txt"
-        head_transform = np.eye(4)
-        if frame_num == 0:
-            first_frame_point_cloud = frame_features["predicted_landmark_3d"][0].numpy()
-            not_nan_indices_1 = ~(np.isnan(first_frame_point_cloud).any(axis=1))
-        else:
-            frame_point_cloud = frame_features["predicted_landmark_3d"][0].numpy()
-            not_nan_indices = ~(np.isnan(frame_point_cloud).any(axis=1))
-            not_nan_indices = np.logical_and(not_nan_indices_1, not_nan_indices)
-            source = first_frame_point_cloud[not_nan_indices].T
-            target = frame_point_cloud[not_nan_indices].T
-            r, t = rigid_transform_3d(source, target)
-            head_transform[:3, :3] = r
-            head_transform[:3, 3] = t.squeeze()
-        np.savetxt(head_transform_file_path, head_transform)
-
-        # save mesh vertices
-        landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        _, _, _, _, _, _, _, _, flame_vertices = face_recon_model.optimize(
+        _, _, _, _, _, _, _, _, flame_vertices, flame_landmarks = face_recon_model.optimize(
             frame_features, first_frame=frame_num == 0)
         flame_vertices = flame_vertices.detach().cpu().numpy().squeeze().astype(np.float32)
+        flame_landmarks = flame_landmarks.detach().cpu().numpy().squeeze().astype(np.float32)
+
+
+        # save head pose transform
+        target = flame_landmarks.T
+        source = reference_landmarks.T
+        r, t = rigid_transform_3d(source, target)
+        head_transform_file_path = config.mesh_data_dir + f"/{frame_id}_transform.txt"
+        head_transform = np.eye(4)
+        head_transform[:3, :3] = r
+        head_transform[:3, 3] = t.squeeze() * scale
+        np.savetxt(head_transform_file_path, head_transform)
+        # save mesh vertices
+        head_transform_ = np.eye(4)
+        head_transform_[:3, :3] = r
+        head_transform_[:3, 3] = t.squeeze()
+        flame_vertices = np.vstack((flame_vertices.T, np.ones(flame_vertices.shape[0])))
+        flame_vertices = np.linalg.inv(head_transform_) @ flame_vertices
+        flame_vertices = flame_vertices[:3].T
+        flame_vertices *= scale
+        flame_vertices = flame_vertices.astype(np.float32)
+
         bin_file_path = config.mesh_data_dir + f"/{frame_id}.bin"
         flame_vertices.tofile(bin_file_path)
+
+        # add to sequence to compute mean and std
         sequence_verts.append(flame_vertices)
 
     sequence_verts = np.stack(sequence_verts, axis=0)
     verts_mean = np.mean(sequence_verts, axis=0)
-    verts_std = np.std(sequence_verts)
+    verts_var = np.var(sequence_verts)
     ver_mean_bin_file_path = config.mesh_data_dir + f"/vert_mean.bin"
     verts_mean.tofile(ver_mean_bin_file_path)
     with open(config.mesh_data_dir + f"/vert_var.txt", 'w') as file:
-        file.write(f'{verts_std**2}')
+        file.write(f'{verts_var/scale}')

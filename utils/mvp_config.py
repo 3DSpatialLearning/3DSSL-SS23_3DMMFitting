@@ -1,30 +1,26 @@
 import os
-import models.mvp.data.multiviewvideo as datamodel
-
 import numpy as np
 
-holdoutcams = []
-holdoutseg = []
+import dataset.MvpDataset as datamodel
 
+################ output path
 outpath = "../output"
 
-capturepath = "../data/experiments/example/data/"
-objpath = "../data/experiments/topology.obj"
-krtpath = os.path.join(capturepath, "KRT")
-geomdir = os.path.join(capturepath, "geom/")
-imagepathbase = os.path.join(capturepath, "images/")
-imagepath = os.path.join(imagepathbase, "{seg}", "{cam}", "{frame:06d}.png")
-# bgpath = os.path.join(imagepathbase, "bg", "images", "cam{cam}", "image0000.png")
+################ input path
+capturepath = "../data/subject_0/"
+objpath = "../data/subject_0_tracked_mesh/flame.obj"
+geomdir = os.path.join("../data/subject_0_tracked_mesh")
 bgpath = None
-baseposepath = os.path.join(capturepath,
-    "geom/tracked_mesh/E001_Neutral_Eyes_Open/000102_transform.txt")
+baseposepath = os.path.join(geomdir, "00000_transform.txt")
 
+################ settings
+holdoutcams = []
+img_size = np.array([2200, 3208])
 num_images_per_row = 4
-batchsize = 5
+batchsize = 4
 
 def get_dataset(
-        camerafilter=lambda x: x.startswith("40") and x not in holdoutcams,
-        segmentfilter=lambda x: x not in holdoutseg,
+        camerafilter=lambda x: x not in holdoutcams,
         keyfilter=[],
         maxframes=-1,
         subsampletype=None,
@@ -51,19 +47,15 @@ def get_dataset(
     downsample : int
         Downsampling factor of input images.
     """
-    img_size=np.array([1334, 2048])
     return datamodel.Dataset(
-        krtpath=krtpath,
         geomdir=geomdir,
-        imagepath=imagepath,
+        capturepath=capturepath,
         bgpath=bgpath,
         returnbg=False,
         avgtexsize=256,
         baseposepath=baseposepath,
         camerafilter=camerafilter,
-        segmentfilter=segmentfilter,
         keyfilter=["bg", "camera", "modelmatrix", "modelmatrixinv", "pixelcoords", "image", "verts"] + keyfilter,
-        # keyfilter=["bg", "camera", "modelmatrix", "modelmatrixinv", "pixelcoords", "image", "avgtex", "verts"] + keyfilter,
         maxframes=maxframes,
         subsampletype=subsampletype,
         subsamplesize=384,
@@ -71,7 +63,9 @@ def get_dataset(
         blacklevel=[3.8, 2.5, 4.0],
         maskbright=True,
         maskbrightbg=True,
-        img_size=img_size
+        img_size=img_size,
+        convention="opengl",
+        scale=1000.
         )
 
 def get_renderoptions():
@@ -82,9 +76,9 @@ def get_renderoptions():
             dt=1.0) # stepsize
 
 def get_autoencoder(dataset, renderoptions):
+    print(f"Render options: {renderoptions}")
     """Return an autoencoder instance"""
     import torch
-    import torch.nn as nn
     import models.mvp.models.volumetric as aemodel
     import models.mvp.models.encoders.geotex as encoderlib
     import models.mvp.models.decoders.mvp as decoderlib
@@ -94,7 +88,6 @@ def get_autoencoder(dataset, renderoptions):
     from models.mvp.utils import utils
 
     allcameras = dataset.get_allcameras()
-    ncams = len(allcameras)
     width, height = next(iter(dataset.get_krt().values()))["size"]
 
     # per-camera color calibration
@@ -105,7 +98,7 @@ def get_autoencoder(dataset, renderoptions):
     vt = np.array(vt, dtype=np.float32)
     vi = np.array(vi, dtype=np.int32)
     vti = np.array(vti, dtype=np.int32)
-    idxim, tidxim, barim = utils.gentritex(v, vt, vi, vti, 1024)
+    idxim, tidxim, barim = utils.gentritex(v, vt, vi, vti, 256)
     idxim = torch.tensor(idxim).long()
     tidxim = torch.tensor(tidxim).long()
     barim = torch.tensor(barim)
@@ -113,14 +106,14 @@ def get_autoencoder(dataset, renderoptions):
     vertmean = torch.from_numpy(dataset.vertmean)
     vertstd = dataset.vertstd
 
-    encoder = encoderlib.Encoder(texin=False, texsize=256)
+    encoder = encoderlib.Encoder(vertsize=len(v)*3, texin=False)
     print("encoder:", encoder)
 
     volradius = 256.
     decoder = decoderlib.Decoder(
         vt, vertmean, vertstd,
         idxim, tidxim, barim,
-        volradius=volradius,
+        volradius=256.,
         dectype="slab2d",
         nprims=256,
         primsize=(32, 32, 32),
@@ -193,7 +186,7 @@ class Train():
         """The optimizer used to train the autoencoder parameters."""
         import itertools
         import torch.optim
-        lr = 0.002
+        lr = 2e-3
         aeparams = itertools.chain(
             [{"params": x} for k, x in ae.encoder.named_parameters()],
             [{"params": x} for k, x in ae.decoder.named_parameters()],
@@ -205,7 +198,6 @@ class Train():
 
 class ProgressWriter():
     def batch(self, iternum, itemnum, **kwargs):
-        print(kwargs["irgbrec"].shape)
         import numpy as np
         from PIL import Image
         rows = []
@@ -222,7 +214,7 @@ class ProgressWriter():
             rows.append(np.concatenate([row[i] if i < len(row) else row[0]*0. for i in range(num_images_per_row)], axis=1))
         imgout = np.concatenate(rows, axis=0)
         Image.fromarray(np.clip(imgout, 0, 255).astype(np.uint8)).save(
-                os.path.join(outpath, "prog_{:06}.jpg".format(iternum)))
+                os.path.join(outpath, "prog_{:05}.jpg".format(iternum)))
     def finalize(self):
         pass
 

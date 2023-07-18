@@ -31,7 +31,7 @@ def compute_tbn(v0, v1, v2, vt0, vt1, vt2):
     v02 = v2 - v0
     vt01 = vt1 - vt0
     vt02 = vt2 - vt0
-    f = 1. / (vt01[None, :, :, 0] * vt02[None, :, :, 1] - vt01[None, :, :, 1] * vt02[None, :, :, 0])
+    f = 1. / (vt01[None, :, :, 0] * vt02[None, :, :, 1] - vt01[None, :, :, 1] * vt02[None, :, :, 0] + 1e-6)
     tangent = f[:, :, :, None] * torch.stack([
         v01[:, :, :, 0] * vt02[None, :, :, 1] - v02[:, :, :, 0] * vt01[None, :, :, 1],
         v01[:, :, :, 1] * vt02[None, :, :, 1] - v02[:, :, :, 1] * vt01[None, :, :, 1],
@@ -446,12 +446,11 @@ class Decoder(nn.Module):
             # compose mesh transform with deltas
             primpos = primposmesh + primposdelta * 0.01
             primrotdelta = models.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.01)
+
             primrot = torch.bmm(
                     primrotmesh.view(-1, 3, 3),
                     primrotdelta.view(-1, 3, 3)).view(encoding.size(0), self.nprims, 3, 3)
             primscale = (self.scalemult * int(self.nprims ** (1. / 3))) * torch.exp(primscaledelta * 0.01)
-
-            primtransf = None
         else:
             geo = None
 
@@ -466,8 +465,6 @@ class Decoder(nn.Module):
             primrotdelta = models.mvp.models.utils.axisangle_to_matrix(primrvecdelta * 0.3)
             primrot = torch.exp(primrotdelta * 0.01)
             primscale = (self.scalemult * int(self.nprims ** (1. / 3))) * primscaledelta
-
-            primtransf = None
 
         # options
         algo = renderoptions.get("algo")
@@ -628,8 +625,6 @@ class Decoder(nn.Module):
                 "primpos": primpos,
                 "primrot": primrot,
                 "primscale": primscale}
-        if primtransf is not None:
-            result["primtransf"] = primtransf
         if warp is not None:
             result["warp"] = warp
         if geo is not None:

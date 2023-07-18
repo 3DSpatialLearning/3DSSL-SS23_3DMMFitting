@@ -135,7 +135,7 @@ class FaceReconModel(nn.Module):
         )
 
     def get_flame(self):
-        vertices_world, _, _ = self.face_model(
+        vertices_world, flame_landmarks, _ = self.face_model(
             shape_params=self.shape_coeffs,
             expression_params=self.exp_coeffs,
             pose_params=self.pose_coeffs,
@@ -146,7 +146,8 @@ class FaceReconModel(nn.Module):
         vertices_world = vertices_world.detach().cpu().numpy().squeeze()
         faces = self.face_model.faces.squeeze()
         uvcoords = self.uvcoords.detach().cpu().numpy().squeeze()
-        return vertices_world, faces, uvcoords
+        flame_landmarks = flame_landmarks.detach().cpu().numpy().squeeze()
+        return vertices_world, flame_landmarks, faces, uvcoords
 
     ### Camera-related functions ###
     def set_transformation_matrices_for_optimization(
@@ -671,5 +672,6 @@ class FaceReconModel(nn.Module):
 
         # increase the counter
         self.counter += 1
-        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, scan_to_mesh_loss, vertices_world
+        return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, \
+               scan_to_mesh_loss, vertices_world, landmarks_68_world
 

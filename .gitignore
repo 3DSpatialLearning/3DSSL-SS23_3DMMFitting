@@ -160,26 +160,7 @@ cython_debug/
 .idea/
 .vscode/
 
-# ignore flame
-*.pkl
-*.npz
-*.obj
-
-# ignore npy and rgb
-*.npy
-*.png
-
-# ignore models_ and checkpoints
-*.dat
-*.tflite
-
-# ignore mvp data
-/data/experiments
-*.bin
-*transform.txt
-vert_var.txt
-tex_var.txt
-
+data/
 
 # ignore logs
 /output

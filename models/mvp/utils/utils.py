@@ -28,8 +28,8 @@ class Logger(object):
     """Duplicates all stdout to a file."""
     def __init__(self, path, mode):
         if mode == "w" and os.path.exists(path):
-            print(path + " exists, removing and creating new")
-            os.remove(path)
+            print(path + " exists")
+            sys.exit(0)
 
         self.log = open(path, mode)
         self.stdout = sys.stdout

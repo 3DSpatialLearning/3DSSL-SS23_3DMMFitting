@@ -228,26 +228,6 @@ class Autoencoder(nn.Module):
 
             resultlosses["vertmse"] = (vertmse, vertmse_weight)
 
-        # compute texture loss
-        if "trgbmse" in losslist or "trgbsqerr" in outputlist:
-            weight = (validinput[:, None, None, None] * texmask[:, None, :, :].float()).expand_as(tex).contiguous()
-
-            # re-standardize
-            texrecstd = (decout["tex"] - self.texmean.to("cuda")) / self.texstd
-            texstd = (tex - self.texmean.to("cuda")) / self.texstd
-
-            texsqerr = weight * (texstd - texrecstd) ** 2
-
-            if "trgbsqerr" in outputlist:
-                resultout["trgbsqerr"] = texsqerr
-
-            # texture rgb mean-squared-error
-            if "trgbmse" in losslist:
-                texmse = torch.sum(texsqerr.view(texsqerr.size(0), -1), dim=-1)
-                texmse_weight = torch.sum(weight.view(weight.size(0), -1), dim=-1)
-
-                resultlosses["trgbmse"] = (texmse, texmse_weight)
-
         # subsample depth, imagerec, imagerecmask
         if image is not None and pixelcoords.size()[1:3] != image.size()[2:4]:
             imagesize = torch.tensor(image.size()[3:1:-1], dtype=torch.float32, device=pixelcoords.device)
@@ -259,6 +239,7 @@ class Autoencoder(nn.Module):
         # compute ray directions
         if self.cudaraydirs:
             raypos, raydir, tminmax = compute_raydirs(viewpos, viewrot, focal, princpt, pixelcoords, self.volradius)
+
         else:
             raydir = compute_raydirs_ref(pixelcoords, viewrot, focal, princpt)
             raypos, tminmax = compute_rmbounds(viewpos, raydir, self.volradius)
