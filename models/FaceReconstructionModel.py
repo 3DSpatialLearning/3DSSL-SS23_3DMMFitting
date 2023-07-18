@@ -507,6 +507,7 @@ class FaceReconModel(nn.Module):
         first_frame: bool = False,
         deca_pred_verts: np.ndarray = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+
         color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, scan_to_mesh_loss, scan_to_mesh_loss_deca = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
 
         for resolution, lr, opt_steps, cam2ndc, intrinsic in zip(self.coarse2fine_resolutions,
@@ -689,6 +690,26 @@ class FaceReconModel(nn.Module):
                                                             threshold=0.000025)
             scan_to_mesh_loss_deca = torch.sqrt(scan_to_mesh_loss_deca)
 
+            import pyvista as pv
+            pv_scan_points = pv.PolyData(pixels_world_input.cpu().numpy())
+            pv_3d_mesh = pv.PolyData(deca_pred_verts,
+                             np.concatenate((np.ones((self.faces.shape[0], 1)) * 3,
+                                             self.faces.cpu().numpy()), axis=-1).reshape(-1).astype(np.int64))
+            pv_3d_mesh_pred = pv.PolyData(vertices_world[0].detach().cpu().numpy(),
+                                np.concatenate((np.ones((self.faces.shape[0], 1)) * 3,
+                                                self.faces.cpu().numpy()), axis=-1).reshape(-1).astype(np.int64))
+            np.save('scan_points.npy', pixels_world_input.cpu().numpy())
+            np.save('3d_mesh_pred.npy', vertices_world[0].detach().cpu().numpy())
+            np.save('faces.npy', np.concatenate((np.ones((self.faces.shape[0], 1)) * 3,
+                                                self.faces.cpu().numpy()), axis=-1).reshape(-1).astype(np.int64))
+            plotter = pv.Plotter()
+            plotter.camera_position = 'xy'
+            plotter.background_color = 'white'
+            plotter.add_mesh(pv_scan_points, point_size=5, color='red')
+            # plotter.add_mesh(pv_3d_mesh, color='red', opacity=0.5)
+            plotter.add_mesh(pv_3d_mesh_pred, color='green')
+            plotter.show()
+            exit()
         # increase the counter
         self.counter += 1
         return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, \

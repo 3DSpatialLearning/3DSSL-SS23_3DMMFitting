@@ -169,7 +169,7 @@ parser.add_argument(
 parser.add_argument(
     '--depth_camera_ids',
     type=json.loads,
-    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
+    default="[]",
     help='Id of the cameras that are used for the depth fitting. Note, depth camera'
          'ids must be a subset of the rgb camera ids.'
 )
@@ -177,7 +177,7 @@ parser.add_argument(
 parser.add_argument(
     '--rgb_camera_ids',
     type=json.loads,
-    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
+    default="[222200036, 222200037, 222200038, 222200039]",
     help='Id of the cameras that are used for the rgb fitting'
 )
 
@@ -361,7 +361,7 @@ parser.add_argument(
 parser.add_argument(
     '--use_chamfer',
     type=bool,
-    default=True,
+    default=False,
     help='If true use chamfer loss instead of point to point and point to plane'
 )
 
