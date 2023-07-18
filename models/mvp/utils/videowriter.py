@@ -269,11 +269,11 @@ class Writer():
                 r.wait()
 
         if self.nitems == 1:
-            os.system("cp /tmp/{}/{:06}.png {}.png".format(self.randid, 0, self.outpath[:-4]))
+            os.system("cp /tmp/{}/{:05}.png {}.png".format(self.randid, 0, self.outpath[:-4]))
         elif self.nitems > 0:
             # make video file
             command = (
-                    "ffmpeg -y -r 30 -i /tmp/{}/%06d.png "
+                    "ffmpeg -y -r 30 -i /tmp/{}/%05d.png "
                     "-vframes {} "
                     "-vcodec libx264 -crf 18 "
                     "-pix_fmt yuv420p "
