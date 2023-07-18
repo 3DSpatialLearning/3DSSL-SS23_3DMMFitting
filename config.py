@@ -164,13 +164,12 @@ parser.add_argument(
     help='Directory containing the camera data'
 )
 
-# "[222200036, 222200037, 222200038, 222200039, 222200041, 222200042,"
-#             "222200044, 222200045, 222200046, 222200047, 222200048, 222200049]"
+# "[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]"
 
 parser.add_argument(
     '--depth_camera_ids',
     type=json.loads,
-    default="[222200036, 222200037, 222200049]",
+    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
     help='Id of the cameras that are used for the depth fitting. Note, depth camera'
          'ids must be a subset of the rgb camera ids.'
 )
@@ -178,7 +177,7 @@ parser.add_argument(
 parser.add_argument(
     '--rgb_camera_ids',
     type=json.loads,
-    default="[222200036, 222200037, 222200049]",
+    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
     help='Id of the cameras that are used for the rgb fitting'
 )
 
@@ -223,13 +222,28 @@ parser.add_argument(
     default="data/checkpoints/hair_segmenter.tflite",
     help='Path hair segmenter checkpoint'
 )
+
+parser.add_argument(
+    '--deca_output_path',
+    type=str,
+    default="data/deca/subject_0",
+    help='Path to deca output'
+)
+
 ####################### Fitting #######################
 
 parser.add_argument(
-    '--num_samples',
+    '--num_samples_flame',
     type=int,
     default=10000,
     help='Num of points to sample from Flame mesh'
+)
+
+parser.add_argument(
+    '--num_samples_scan',
+    type=int,
+    default=20000,
+    help='Num of points to sample from scan mesh'
 )
 
 parser.add_argument(
@@ -340,15 +354,22 @@ parser.add_argument(
 parser.add_argument(
     '--shape_fitting_frames',
     type=int,
-    default=3,
+    default=10,
     help='Number of frames to use for shape fitting'
 )
 
 parser.add_argument(
     '--use_chamfer',
     type=bool,
-    default=False,
+    default=True,
     help='If true use chamfer loss instead of point to point and point to plane'
+)
+
+parser.add_argument(
+    '--use_color',
+    type=bool,
+    default=True,
+    help='If true use photometric loss'
 )
 
 def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
