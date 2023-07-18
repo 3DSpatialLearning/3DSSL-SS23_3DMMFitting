@@ -14,9 +14,9 @@ from config import get_config
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
 
-from models_.FaceReconstructionModel import FaceReconModel
-from models_.HairSegmenter import HairSegmenter
-from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
+from models.FaceReconstructionModel import FaceReconModel
+from models.HairSegmenter import HairSegmenter
+from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 from pathlib import Path
 from glob import glob
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     for frame_num, (frame_features, deca_output) in enumerate(zip(dataloader, deca_output_paths)):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca = face_recon_model.optimize(frame_features, first_frame = frame_num == 0, deca_pred_verts=np.load(deca_output))
+        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca, _, _ = face_recon_model.optimize(frame_features, first_frame = frame_num == 0, deca_pred_verts=np.load(deca_output))
 
         # Log the losses
         writer.add_scalar('per frame scan to mesh distance', scan_to_mesh_distance.item(), frame_num)

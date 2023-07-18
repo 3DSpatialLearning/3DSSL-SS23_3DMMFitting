@@ -14,9 +14,9 @@ from pytorch3d.structures import Meshes
 from torch.optim.lr_scheduler import ExponentialLR
 
 from flame.FLAME import FLAME, FLAMETex
-from utils.transform import intrinsics_to_projection
-from utils.utils import resize_long_side, scale_intrinsic_matrix
-from utils.loss import *
+from utils_.transform import intrinsics_to_projection
+from utils_.utils import resize_long_side, scale_intrinsic_matrix
+from utils_.loss import *
 from pytorch3d.ops import sample_points_from_meshes
 from kornia.filters.sobel import spatial_gradient
 
@@ -693,3 +693,5 @@ class FaceReconModel(nn.Module):
         self.counter += 1
         return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, \
                     scan_to_mesh_loss, scan_to_mesh_loss_deca, vertices_world, landmarks_68_world
+
+

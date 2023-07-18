@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     for frame_num, frame_features in enumerate(dataloader):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca, _, _ = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
         # Log the losses
         writer.add_scalar('per frame scan to mesh distance', scan_to_mesh_distance.item(), frame_num)
