@@ -16,8 +16,8 @@ baseposepath = os.path.join(geomdir, "00000_transform.txt")
 ################ settings
 holdoutcams = []
 img_size = np.array([2200, 3208])
-num_images_per_row = 4
-batchsize = 4
+num_images_per_row = 3
+batchsize = 6
 
 def get_dataset(
         camerafilter=lambda x: x not in holdoutcams,
@@ -229,7 +229,7 @@ class Progress():
 class Eval():
     """Profile for evaluating models."""
     def __init__(self, outfilename=None, outfilesuffix=None,
-            cam=None, camdist=768., camperiod=512, camrevs=0.25,
+            cam=None, camdist=768., camperiod=64, camrevs=0.2,
             segments=["S23_When_she_awoke_she_was_the_ship."],
             maxframes=-1,
             keyfilter=[],

@@ -3,21 +3,23 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""Train an autoencoder."""
+"""
+    Script to train the mvp autoencoder.
+    The config file is in utils/mvp_config.py
+"""
 import argparse
 from pathlib import Path
 import sys
 import time
 sys.dont_write_bytecode = True
-
 import numpy as np
 import torch.utils.data
 
-torch.backends.cudnn.benchmark = True
-
 from models.mvp.utils import utils
 
-# torch.autograd.set_detect_anomaly(True)
+torch.backends.cudnn.benchmark = True
+
+
 
 if __name__ == "__main__":
     # parse arguments
@@ -112,10 +114,10 @@ if __name__ == "__main__":
 
     # train
     starttime = time.time()
-    evalpoints = np.geomspace(1., profile.maxiter, 100).astype(np.int32)
+    evalpoints = np.geomspace(1., profile.maxiter, 200).astype(np.int32)
     prevloss = np.inf
 
-    for epoch in range(10000):
+    for epoch in range(50000):
         for data in dataloader:
             # forward
             cudadata = utils.tocuda(data)

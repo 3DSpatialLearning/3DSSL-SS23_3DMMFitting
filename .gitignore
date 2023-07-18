@@ -165,7 +165,7 @@ data/
 # ignore logs
 /output
 /runs
-example/runs
+model_scripts/runs
 
 # keep folders
 !.gitkeep
