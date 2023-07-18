@@ -19,8 +19,6 @@ from models.HairSegmenter import HairSegmenter
 from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 from pathlib import Path
-from glob import glob
-
 
 if __name__ == '__main__':
 
