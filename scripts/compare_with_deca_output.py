@@ -19,6 +19,7 @@ from models_.HairSegmenter import HairSegmenter
 from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 from pathlib import Path
+from glob import glob
 
 
 if __name__ == '__main__':
@@ -31,6 +32,9 @@ if __name__ == '__main__':
     output_video_name = config.output_video_name
     workdir = config.workdir
     draw_landmarks = config.draw_landmarks
+    deca_output_dir = Path(config.deca_output_path)
+
+    deca_output_paths = sorted(deca_output_dir.glob("*.npy"))
 
     # Set project dir
     project_dir = (Path(workdir) / f"{experiment_name}").absolute()
@@ -98,10 +102,11 @@ if __name__ == '__main__':
 
     # Get the scan to mesh distance list
     scan_to_mesh_distance_list = []
+    scan_to_mesh_distance_deca_list = []
 
-    for frame_num, frame_features in enumerate(dataloader):
+    for frame_num, (frame_features, deca_output) in enumerate(zip(dataloader, deca_output_paths)):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca = face_recon_model.optimize(frame_features, first_frame = frame_num == 0, deca_pred_verts=np.load(deca_output))
 
         # Log the losses
         writer.add_scalar('per frame scan to mesh distance', scan_to_mesh_distance.item(), frame_num)
@@ -129,16 +134,27 @@ if __name__ == '__main__':
         video.write(combined_img)
 
         scan_to_mesh_distance_list.append(scan_to_mesh_distance.item())
-    
+        scan_to_mesh_distance_deca_list.append(scan_to_mesh_distance_deca.item())
+
     # Compute the mean and std of the scan to mesh distance
     scan_to_mesh_distance_list = np.array(scan_to_mesh_distance_list)
     scan_to_mesh_distance_mean = np.mean(scan_to_mesh_distance_list)
     scan_to_mesh_distance_std = np.std(scan_to_mesh_distance_list)
 
+    # Compute the mean and std of the scan to mesh distance for deca
+    scan_to_mesh_distance_deca_list = np.array(scan_to_mesh_distance_deca_list)
+    scan_to_mesh_distance_deca_mean = np.mean(scan_to_mesh_distance_deca_list)
+    scan_to_mesh_distance_deca_std = np.std(scan_to_mesh_distance_deca_list)
+
     # Log the mean and std of the scan to mesh distance
     with open(str(run_dir / "scan_to_mesh_distance.txt"), "w") as f:
         f.write(f"Mean scan to mesh distance: {scan_to_mesh_distance_mean}\n")
         f.write(f"Std scan to mesh distance: {scan_to_mesh_distance_std}\n")
+
+    # Log the mean and std of the scan to mesh distance for deca
+    with open(str(run_dir / "scan_to_mesh_distance_deca.txt"), "w") as f:
+        f.write(f"Mean scan to mesh distance: {scan_to_mesh_distance_deca_mean}\n")
+        f.write(f"Std scan to mesh distance: {scan_to_mesh_distance_deca_std}\n")
 
     cv2.destroyAllWindows()
     video.release()
