@@ -1,18 +1,18 @@
+# 3DMM Tracking (Master's Practical Course Project)
+The main feature of this repository code is to track a FLAME mesh given RGB image, multiview RGB and/or depth map as input. The reconstruction fidelity depends on the input and with the experiments we showed that it performs the best when both multiview RGB and depth information is given. We built the dataloader expecting the data in a certain structure but we can't publicly expose it due to privacy concerns.
+Apart from the tracking we also offer the adapted training and rendering code for MVP.
+
+Other used models come from:
+- PIPNet: https://github.com/jhb86253817/PIPNet
+- MVP: https://github.com/facebookresearch/mvp
+
 ## Installation
-
-### Windows/Linux
-```bash
-pip install -e .
-pip install -r requirements.txt
-```
-Install pytorch3d following the steps from: https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md
-
-### MacOS
+### MacOS (Not tested)
 ```bash
 pip install -e .
 pip install -r requirements-mac.txt
 ```
-## Conda environment setup
+### Linux
 ```bash
 conda create -n 3d_fitting python=3.9 -y
 conda activate 3d_fitting
@@ -33,9 +33,50 @@ conda install -c fvcore -c iopath -c conda-forge fvcore iopath
 conda install pytorch3d -c pytorch3d
 
 # Compile the nms module of PIPnet
-cd models_/PIPNET/FaceBoxesV2/utils
+cd models/PIPNET/FaceBoxesV2/utils
 sh make.sh
 
-# Some package got overwritten, we need to uninstall them first
+# Compile mvp cuda raymarching and utils
+cd models/mvp/extensions/mvpraymarch
+make
+cd models/mvp/extensions/utils
+make
+
+# Some packages got overwritten, we need to uninstall them first and use the exact version
 pip uninstall numpy
 pip install numpy==1.23.1
+```
+### Windows
+```bash
+conda create -n 3d_fitting python=3.9 -y
+conda activate 3d_fitting
+
+# Install dependencies
+pip install -e .
+pip install -r requirements.txt
+
+# Install pytorch with conda
+## First uninstall the installed torch
+pip uninstall torch -y
+
+conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.7 cudatoolkit=11.7 -c pytorch -c nvidia
+
+# Install pytroch 3D
+Follow instructions from https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md
+
+
+# Compile the nms module of PIPnet
+cd models/PIPNET/FaceBoxesV2/utils
+=> Comment out the line 46 (extra_compile_args) in build.py
+python build.py build_ext --inplace
+
+# Compile mvp cuda raymarching and utils
+cd models/mvp/extensions/mvpraymarch
+python setup.py build_ext --inplace
+cd models/mvp/extensions/utils
+python setup.py build_ext --inplace
+
+# Some packages got overwritten, we need to uninstall them first and use the exact version
+pip uninstall numpy
+pip install numpy==1.23.1
+```

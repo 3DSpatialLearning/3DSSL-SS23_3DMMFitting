@@ -217,6 +217,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--hair_segmenter_path',
+    type=str,
+    default="data/checkpoints/hair_segmenter.tflite",
+    help='Path hair segmenter checkpoint'
+)
+
+parser.add_argument(
     '--deca_output_path',
     type=str,
     default="data/deca/subject_0",
@@ -372,10 +379,19 @@ def get_config(path_to_data_dir: str ='') -> argparse.Namespace:
     assert 0 < config.expression_params <= 100, "Shape params should be between 1 and 100"
 
     config.flame_model_path = path_to_data_dir + config.flame_model_path
+    config.mediapipe_landmark_embedding_path = path_to_data_dir + config.mediapipe_landmark_embedding_path
     config.static_landmark_embedding_path = path_to_data_dir + config.static_landmark_embedding_path
     config.dynamic_landmark_embedding_path = path_to_data_dir + config.dynamic_landmark_embedding_path
+    config.tex_space_path = path_to_data_dir + config.tex_space_path
+    config.head_template_mesh_path = path_to_data_dir + config.head_template_mesh_path
+    config.flame_masks_path = path_to_data_dir + config.flame_masks_path
+
     config.cam_data_dir = path_to_data_dir + config.cam_data_dir
+    config.mesh_data_dir = config.cam_data_dir + "_tracked_mesh"
+
     config.dlib_face_predictor_path = path_to_data_dir + config.dlib_face_predictor_path
+    config.hair_segmenter_path = path_to_data_dir + config.hair_segmenter_path
+
     if config.device is None:
         config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     return config

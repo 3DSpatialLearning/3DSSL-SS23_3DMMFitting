@@ -10,9 +10,9 @@ from config import get_config
 from dataset.CameraFrameDataset import CameraFrameDataset
 from dataset.transforms import ToTensor
 
-from models_.FaceReconstructionModel import FaceReconModel
-from models_.HairSegmenter import HairSegmenter
-from models_.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
+from models.FaceReconstructionModel import FaceReconModel
+from models.HairSegmenter import HairSegmenter
+from models.LandmarkDetectorPIPNET import LandmarkDetectorPIPENET
 
 """
   Multi-camera multi-frame FLAME fitting pipeline.
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     for frame_num, frame_features in enumerate(dataloader):
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
-        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
+        color, depth, input_color, input_depth, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, _ = face_recon_model.optimize(frame_features, first_frame = frame_num == 0)
 
         
         color = (color[rgb_in_landmarks_mask].squeeze(0).detach().cpu().numpy()[:, :, ::-1] * 255).astype(np.uint8)

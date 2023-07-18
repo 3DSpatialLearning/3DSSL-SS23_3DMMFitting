@@ -9,8 +9,8 @@ from torch import nn
 from torchvision.transforms.transforms import Compose as TransformCompose
 from scipy.spatial.distance import cdist
 
-from utils_.transform import backproject_points, filter_outliers_landmarks
-from models_.HairSegmenter import HairSegmenter
+from utils.transform import backproject_points, filter_outliers_landmarks
+from models.HairSegmenter import HairSegmenter
 
 """
     This dataset is used to load a all relevant data related to a sequence of frames from cameras.
@@ -106,6 +106,7 @@ class CameraFrameDataset(Dataset):
             "intrinsics": np.load(os.path.join(path, self.intrinsics_filename)),
             "extrinsics": np.load(os.path.join(path, self.extrinsics_filename)),
             "camera_id": int(cam_folder),
+            "frame_id": frame_id
         }
 
         if self.has_predicted_landmarks:
@@ -165,7 +166,7 @@ class CameraFrameDataset(Dataset):
 
                     camera_intrinsics = np.load(os.path.join(path_to_cam_folder, self.intrinsics_filename))
                     camera_extrinsics = np.load(os.path.join(path_to_cam_folder, self.extrinsics_filename))
-                    landmark_3d = backproject_points(landmark_2d, depth, camera_intrinsics, camera_extrinsics)
+                    landmark_3d = backproject_points(depth, camera_intrinsics, camera_extrinsics, points=landmark_2d)
 
                     # clear low consistency landmarks
                     landmark_3d[landmark_3d[:, 2] == 0] = [np.nan, np.nan, np.nan]
