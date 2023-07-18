@@ -57,15 +57,29 @@ def run(
         if not dest_images_folder.exists():
             dest_images_folder.mkdir(parents=True)
 
+        dest_images_folder = dest_folder_camera / "bg"
+        if not dest_images_folder.exists():
+            dest_images_folder.mkdir(parents=True)
+
     ## Process frames
     print("Processing frames...")
     for frame_folder in tqdm(sequences_folder.iterdir()):
+        break
         frame_num = frame_folder.stem.split("_")[1]
         colmap_folder = frame_folder / "colmap-73fps"
         colmap_consistency_folder = colmap_folder / "consistency_graphs" / "12"
         colmap_depth_folder = colmap_folder / "depth_maps_geometric" / "12"
 
         images_folder = frame_folder / "images-73fps"
+        bg_folder = frame_folder / "alpha_map-73fps"
+
+        ### Copy background mask
+        for image in bg_folder.iterdir():
+            camera_id = image.stem.split("_")[1]
+            if camera_id in VALID_CAMERA_IDS:
+                dest_image_path = dest_folder / camera_id / "bg" / f"{frame_num}.png"
+                if not dest_image_path.exists():
+                    shutil.copy(image, dest_image_path)
 
         ### Copy images
         for image in images_folder.iterdir():
@@ -130,8 +144,8 @@ def run(
         extrinsics_matrix[:3, :3] = axis_angle_to_rotation_matrix(r)
         extrinsics_matrix[:3, 3] = t
         extrinsics_matrix = extrinsics_matrix.astype(np.float32)
+        extrinsics_matrix = np.linalg.inv(extrinsics_matrix)
         np.save(str(dest_extrinsics_path), extrinsics_matrix)
-
 
 if __name__ == '__main__':
     fire.Fire(run)

@@ -6,9 +6,9 @@ import os
 def convert_images_to_video(
         image_folder: str = "data/toy_task/multi_frame_rgbd_fitting/222200037/images",
         video_name: str = "output.mp4",
-        frame_rate: int = 5
+        frame_rate: int = 24
 ):
-    images = [img for img in os.listdir(image_folder) if img.endswith(".png") or img.endswith(".jpg")]
+    images = sorted([img for img in os.listdir(image_folder) if img.endswith(".png") or img.endswith(".jpg")])
     frame = cv2.imread(os.path.join(image_folder, images[0]))
     height, width, _ = frame.shape
 

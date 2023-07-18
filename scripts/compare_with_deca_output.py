@@ -103,6 +103,7 @@ if __name__ == '__main__':
     scan_to_mesh_distance_deca_list = []
 
     for frame_num, (frame_features, deca_output) in enumerate(zip(dataloader, deca_output_paths)):
+        print(f"Processing frame {frame_num} out of {len(dataset)}")
         landmark_mask = np.isin(frame_features["camera_id"], config.landmark_camera_id)
         color, _, input_color, _, flame_68_landmarks, flame_mp_landmarks, rgb_in_landmarks_mask, scan_to_mesh_distance, scan_to_mesh_distance_deca, _, _ = face_recon_model.optimize(frame_features, first_frame = frame_num == 0, deca_pred_verts=np.load(deca_output))
 

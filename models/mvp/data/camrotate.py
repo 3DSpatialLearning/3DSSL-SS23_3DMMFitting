@@ -10,7 +10,7 @@ import torch
 import torch.utils.data
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, length, period=512, camdist=0.1, camy=-0.1, revs=0.25, focalmult=1.0):
+    def __init__(self, length, period=32, camdist=0.1, camy=-0.1, revs=0.25, focalmult=1.0):
         self.length = length
         self.period = period
         self.camdist = camdist
