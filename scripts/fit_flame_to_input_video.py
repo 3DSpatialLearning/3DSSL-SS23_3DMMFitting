@@ -121,11 +121,14 @@ if __name__ == '__main__':
             for flame_landmark in flame_mp_landmarks:
                 cv2.circle(color, (int(flame_landmark[0]), int(flame_landmark[1])), 2, (255, 0, 0), -1)
 
-        alpha = 0.5
+        alpha = 0.6
         blended = (cv2.addWeighted(color, alpha, input_color, 1 - alpha, 0)).astype(np.uint8)
 
         combined_img = cv2.hconcat([blended, input_color, color])
         
+        cv2.imwrite(str(run_dir / f"blended_{frame_num}.png"), blended)
+        cv2.imwrite(str(run_dir / f"color_{frame_num}.png"), color)
+        cv2.imwrite(str(run_dir / f"input_color_{frame_num}.png"), input_color)
         video.write(combined_img)
 
         scan_to_mesh_distance_list.append(scan_to_mesh_distance.item())

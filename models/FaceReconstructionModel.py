@@ -70,6 +70,7 @@ class FaceReconModel(nn.Module):
              (pi / 4) * 3 * (np.sqrt(5 / (12 * pi))), (pi / 4) * 3 * (np.sqrt(5 / (12 * pi))),
              (pi / 4) * (3 / 2) * (np.sqrt(5 / (12 * pi))), (pi / 4) * (1 / 2) * (np.sqrt(5 / (4 * pi)))]).float().to(self.device)
 
+        # Get the vertices and faces of the face mask
         with open(face_model_config.flame_masks_path, 'rb') as f:
             masks = pickle.load(f, encoding='latin1')
 
@@ -102,8 +103,11 @@ class FaceReconModel(nn.Module):
         # Optimize-related settings
         self.coarse2fine_lrs_first_frame = face_model_config.coarse2fine_lrs_first_frame
         self.coarse2fine_lrs_next_frames = face_model_config.coarse2fine_lrs_next_frames
+        self.rigid_fitting_lr = face_model_config.rigid_fitting_lr
+
         self.coarse2fine_opt_steps_first_frame = face_model_config.coarse2fine_opt_steps_first_frame
         self.coarse2fine_opt_steps_next_frames = face_model_config.coarse2fine_opt_steps_next_frames
+        self.rigid_fitting_steps = face_model_config.rigid_fitting_steps
 
         self.num_samples_flame = face_model_config.num_samples_flame
         self.num_samples_scan = face_model_config.num_samples_scan
@@ -135,9 +139,10 @@ class FaceReconModel(nn.Module):
                 orig_shape=orig_img_shape,
                 dest_len=x
             ),
-                face_model_config.coarse2fine_resolutions)
+            face_model_config.coarse2fine_resolutions)
         )
 
+    ### MVP-related functions ###
     def get_flame(self):
         vertices_world, flame_landmarks, _ = self.face_model(
             shape_params=self.shape_coeffs,
@@ -152,8 +157,10 @@ class FaceReconModel(nn.Module):
         uvcoords = self.uvcoords.detach().cpu().numpy().squeeze()
         flame_landmarks = flame_landmarks.detach().cpu().numpy().squeeze()
         return vertices_world, flame_landmarks, faces, uvcoords
-    
+    ### MVP-related functions ###
+
     ### Camera-related functions ###
+    # Set transformation matrices for optimization w.r.t. the input views
     def set_transformation_matrices_for_optimization(
         self,
         extrinsic_matrices: torch.Tensor,
@@ -199,6 +206,8 @@ class FaceReconModel(nn.Module):
             intrinsics = torch.stack(intrinsics).to(self.device)
             self.intrinsics.append(intrinsics)
 
+    # Set transformation matrices for the input fused point cloud, which is considered as the GT scan,
+    # w.r.t. the selected views
     def set_transformation_matrices_for_fused_point_cloud(
         self,
         extrinsic_matrices: torch.Tensor,
@@ -209,48 +218,7 @@ class FaceReconModel(nn.Module):
             self.extrinsics_fused_point_cloud.append(extrinsic_matrix.t())
 
         self.extrinsics_fused_point_cloud = torch.stack(self.extrinsics_fused_point_cloud).float().to(self.device)
-    
-    def set_initial_pose(
-        self,
-        first_frame_features: dict
-    ):
-        camera_ids = first_frame_features["camera_id"]
-
-        rgb_camera_mask = np.isin(camera_ids, self.rgb_camera_ids)
-        landmark_camera_mask = np.isin(camera_ids, self.landmark_camera_id)
-        rgb_in_landmark_mask = np.isin(camera_ids[rgb_camera_mask], self.landmark_camera_id)
-
-        input_landmarks = first_frame_features["predicted_landmark_3d"][landmark_camera_mask]
-        input_landmarks = input_landmarks[:, 17:].float().to(self.device)
-
-        not_nan_indices = ~(torch.isnan(input_landmarks).any(dim=-1))
-        input_landmarks = input_landmarks[not_nan_indices]
-
-        for _, lr, opt_steps, _ in zip(self.coarse2fine_resolutions, self.coarse2fine_lrs_first_frame,
-                                       self.coarse2fine_opt_steps_first_frame, self.cam_to_ndc):
-            # Create optimizer
-            optimizer = torch.optim.Adam(
-                [{'params': [self.pose_coeffs, self.transl_coeffs]}],
-                lr=lr,
-            )
-            scheduler = ExponentialLR(optimizer, gamma=0.999)
-
-            for _ in tqdm(range(opt_steps)):
-                _, landmarks_68_model, landmarks_mp_model = self.face_model(
-                    shape_params=self.shape_coeffs,
-                    expression_params=self.exp_coeffs,
-                    pose_params=self.pose_coeffs,
-                    transl=self.transl_coeffs,
-                    cameras_rot=self.cameras_rot[rgb_in_landmark_mask],
-                )
-                landmarks_68_model = landmarks_68_model[:, 17:][not_nan_indices][None, ...]
-                landmarks_68_loss = landmark_distance(input_landmarks, landmarks_68_model, torch.ones(landmarks_68_model.shape[0], landmarks_68_model.shape[1]).to(self.device))
-
-                loss = self.landmarks_68_weight * landmarks_68_loss
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
+    ### Camera-related functions ###
 
     ### Space transformation functions ###
     def _backproject_to_world_space(
@@ -310,7 +278,9 @@ class FaceReconModel(nn.Module):
         pixels_screen[:, :, 0] = (pixels_screen[:, :, 0] + 1) * resolution[1] * 0.5
         pixels_screen[:, :, 1] = (1 - pixels_screen[:, :, 1]) * resolution[0] * 0.5
         return pixels_screen
+    ### Space transformation functions ###
 
+    ### Render-related functions ###
     # The below function is taken from https://github.com/HavenFeng/photometric_optimization/blob/master/renderer.py#L207
     def _add_shlight(
         self,
@@ -324,18 +294,6 @@ class FaceReconModel(nn.Module):
         sh = sh * self.constant_factors[None, :, None, None]
         shading = torch.sum(self.light_coeffs[:, :, :, None, None] * sh[:, :, None, :, :], 1)  # [bz, 9, 3, h, w]
         return shading
-
-    def _compute_normals_from_depth(
-        self,
-        xyz_images: torch.Tensor,
-    ) -> torch.Tensor:
-        gradients = spatial_gradient(xyz_images)  # Bx3x2xHxW
-
-        # compute normals
-        a, b = gradients[:, :, 0], gradients[:, :, 1]  # Bx3xHxW
-
-        normals = torch.cross(a, b, dim=1)  # Bx3xHxW
-        return F.normalize(normals, dim=1, p=2)
 
     def _render(
         self,
@@ -370,7 +328,21 @@ class FaceReconModel(nn.Module):
         color_mask = (rast_out[..., 3] > 0).float().unsqueeze(1)
 
         return color, depth, depth_mask, color_mask
+    ### Render-related functions ###
 
+    ### Data-acquisition-related functions ###
+    def _compute_normals_from_depth(
+        self,
+        xyz_images: torch.Tensor,
+    ) -> torch.Tensor:
+        gradients = spatial_gradient(xyz_images)  # Bx3x2xHxW
+
+        # compute normals
+        a, b = gradients[:, :, 0], gradients[:, :, 1]  # Bx3xHxW
+
+        normals = torch.cross(a, b, dim=1)  # Bx3xHxW
+        return F.normalize(normals, dim=1, p=2)
+    
     def _get_input_rgb_data(
         self,
         resolution: Tuple[int, int],
@@ -500,6 +472,54 @@ class FaceReconModel(nn.Module):
         input_2d_landmarks[:, :, 1] *= resolution[0] / self.orig_img_shape[0]
 
         return input_2d_landmarks
+    ### Data-acquisition-related functions ###
+
+    ### Optimization-related functions ###
+    # Perform the initial rigid fitting for the first frame to get the coarse initial pose
+    # by minimizing landmark distance in the 3D space only
+    def set_initial_pose(
+        self,
+        first_frame_features: dict
+    ):
+        camera_ids = first_frame_features["camera_id"]
+
+        rgb_camera_mask = np.isin(camera_ids, self.rgb_camera_ids)
+        landmark_camera_mask = np.isin(camera_ids, self.landmark_camera_id)
+        rgb_in_landmark_mask = np.isin(camera_ids[rgb_camera_mask], self.landmark_camera_id)
+
+        input_landmarks = first_frame_features["predicted_landmark_3d"][landmark_camera_mask]
+        input_landmarks = input_landmarks[:, 17:].float().to(self.device)
+
+        not_nan_indices = ~(torch.isnan(input_landmarks).any(dim=-1))
+        input_landmarks = input_landmarks[not_nan_indices]
+
+        # Create optimizer
+        optimizer = torch.optim.Adam(
+            [{'params': [self.pose_coeffs, self.transl_coeffs]}],
+            lr=self.rigid_fitting_lr,
+        )
+        scheduler = ExponentialLR(optimizer, gamma=0.999)
+
+        for _ in tqdm(range(self.rigid_fitting_steps)):
+            pose_params = torch.zeros_like(self.pose_coeffs)
+            pose_params[0, 0:3] = self.pose_coeffs[0, 0:3]
+
+            points, landmarks_68_model, landmarks_mp_model = self.face_model(
+                shape_params=self.shape_coeffs,
+                expression_params=self.exp_coeffs,
+                pose_params=pose_params,
+                transl=self.transl_coeffs,
+                cameras_rot=self.cameras_rot[rgb_in_landmark_mask],
+            )
+
+            landmarks_68_model = landmarks_68_model[:, 17:][not_nan_indices][None, ...]
+            landmarks_68_loss = landmark_distance(input_landmarks[None, ...], landmarks_68_model, torch.ones(landmarks_68_model.shape[0], landmarks_68_model.shape[1]).to(self.device))
+
+            loss = self.landmarks_68_weight * landmarks_68_loss
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
 
     def optimize(
         self,
@@ -544,6 +564,9 @@ class FaceReconModel(nn.Module):
             # Create optimizer
             params = [self.exp_coeffs, self.pose_coeffs, self.transl_coeffs, self.albedo, self.neck_pose_coeffs, self.eye_pose_coeffs]
 
+            # The identity is invariant across the entire video and we assume that the lighting is fixed.
+            # Therefore, we optimize the identity and lighting parameters only for a few frames at the beginning
+            # and then fix them for the rest of the video
             if self.counter < self.shape_fitting_frames:
                 params.append(self.shape_coeffs)
                 params.append(self.tex_coeffs)
@@ -658,6 +681,7 @@ class FaceReconModel(nn.Module):
                 scheduler.step()
 
         color = color.reshape(color.shape[0], *self.coarse2fine_resolutions[-1], 3)
+
         if len(self.depth_camera_ids) > 0:
             depth = depth.reshape(depth.shape[0], *self.coarse2fine_resolutions[-1], 1)
         input_rgb = input_rgb.reshape(input_rgb.shape[0], *self.coarse2fine_resolutions[-1], 3)
@@ -676,12 +700,14 @@ class FaceReconModel(nn.Module):
         normals_world_input = torch.concatenate(normals_world)
 
         mesh = Meshes(verts=vertices_world, faces=self.face_faces_only_face[None, ...])
+
         scan_to_mesh_loss, _ = scan_to_mesh_distance(pixels_world_input[None, ...], normals_world_input[None, ...],
                                                      *sample_points_from_meshes(mesh, num_samples=self.num_samples_flame,
                                                                                 return_normals=True),
                                                      threshold=0.000025)
         scan_to_mesh_loss = torch.sqrt(scan_to_mesh_loss)
-
+        
+        # Note (WEI): used only for debugging
         if deca_pred_verts is not None:
             mesh = Meshes(verts=torch.from_numpy(deca_pred_verts[None, ...]).to(self.device), faces=self.face_faces_only_face[None, ...])
             scan_to_mesh_loss_deca, _ = scan_to_mesh_distance(pixels_world_input[None, ...], normals_world_input[None, ...],
@@ -714,3 +740,4 @@ class FaceReconModel(nn.Module):
         self.counter += 1
         return color, depth, input_rgb, input_depth, landmarks_68_screen, landmarks_mp_screen, rgb_in_landmarks_masks, \
                     scan_to_mesh_loss, scan_to_mesh_loss_deca, vertices_world, landmarks_68_world
+    ### Optimization-related functions ###

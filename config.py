@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(description='FLAME fitting config')
 parser.add_argument(
     '--experiment_name',
     type=str,
-    default='test',
+    default='sequence_id_17_test',
     help='experiment name',
 )
 
@@ -160,7 +160,7 @@ parser.add_argument(
 parser.add_argument(
     '--cam_data_dir',
     type=str,
-    default="data/subject_0",
+    default="data/sequences/sequence_id_17",
     help='Directory containing the camera data'
 )
 
@@ -169,7 +169,7 @@ parser.add_argument(
 parser.add_argument(
     '--depth_camera_ids',
     type=json.loads,
-    default="[]",
+    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
     help='Id of the cameras that are used for the depth fitting. Note, depth camera'
          'ids must be a subset of the rgb camera ids.'
 )
@@ -177,7 +177,7 @@ parser.add_argument(
 parser.add_argument(
     '--rgb_camera_ids',
     type=json.loads,
-    default="[222200036, 222200037, 222200038, 222200039]",
+    default="[222200036, 222200037, 222200038, 222200039, 222200041, 222200042, 222200044, 222200045, 222200046, 222200047, 222200048, 222200049]",
     help='Id of the cameras that are used for the rgb fitting'
 )
 
@@ -268,6 +268,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--rigid_fitting_lr',
+    type=float,
+    default=1e-1,
+    help='learning rate for the rigid fitting'
+)
+
+parser.add_argument(
     '--coarse2fine_opt_steps_first_frame',
     type=list,
     default=[300, 200, 100],
@@ -279,6 +286,13 @@ parser.add_argument(
     type=list,
     default=[50, 30, 20],
     help='number of optimization steps associated to every level for the next frames'
+)
+
+parser.add_argument(
+    '--rigid_fitting_steps',
+    type=int,
+    default=800,
+    help='Number of rigid fitting steps'
 )
 
 parser.add_argument(

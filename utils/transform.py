@@ -77,9 +77,7 @@ def backproject_points(points: np.ndarray, depth_map: np.ndarray, K: np.ndarray,
     assert points.shape[1] == 2
     assert K.shape == (3, 3)
     assert E.shape == (4, 4)
-
     depths = depth_map[points[:, 1], points[:, 0]].reshape(-1, 1)
-
     # screen space to cam space
     points_homo = np.hstack((points, np.ones((len(points), 1)))).T
     cam_coords = depths * (np.linalg.inv(K) @ points_homo).T
