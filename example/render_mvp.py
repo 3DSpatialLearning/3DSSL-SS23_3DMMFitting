@@ -105,6 +105,9 @@ if __name__ == "__main__":
     else:
         cm = nullcontext()
 
+
+    savepath = os.path.join(outpath, "render")
+
     with cm as prof:
         with torch.inference_mode():
             for data in dataloader:

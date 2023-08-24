@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(description='FLAME fitting config')
 parser.add_argument(
     '--experiment_name',
     type=str,
-    default='sequence_id_17_test',
+    default='sequence_id_17',
     help='experiment name',
 )
 
@@ -160,7 +160,7 @@ parser.add_argument(
 parser.add_argument(
     '--cam_data_dir',
     type=str,
-    default="data/sequences/sequence_id_17",
+    default="data/subject_17",
     help='Directory containing the camera data'
 )
 

@@ -186,6 +186,7 @@ class CameraFrameDataset(Dataset):
                     landmark_2d[:] = np.nan
                 np.save(os.path.join(predicted_landmarks_2d_dir, f"{frame}.npy"), landmark_2d)
                 np.save(os.path.join(predicted_landmarks_3d_dir, f"{frame}.npy"), landmark_3d)
+            self.has_predicted_landmarks = True
 
     """
         Precompute hair segmentation mask for all frames in all cameras in the dataset using the provided hair segmentor if they are not already precomputed

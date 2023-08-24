@@ -3,12 +3,12 @@ import cv2
 import os
 
 
-def convert_images_to_video(
-        image_folder: str = "data/toy_task/multi_frame_rgbd_fitting/222200037/images",
-        video_name: str = "output.mp4",
-        frame_rate: int = 24
+def create_video_from_frames(
+        image_folder: str = "../output/",
+        video_name: str = "../output/output.mp4",
+        frame_rate: int = 15
 ):
-    images = sorted([img for img in os.listdir(image_folder) if img.endswith(".png") or img.endswith(".jpg")])
+    images = sorted([img for img in os.listdir(image_folder) if img.endswith(".png")])
     frame = cv2.imread(os.path.join(image_folder, images[0]))
     height, width, _ = frame.shape
 
@@ -21,6 +21,8 @@ def convert_images_to_video(
     cv2.destroyAllWindows()
     video.release()
 
+    print("Video created saved in", video_name)
+
 
 if __name__ == '__main__':
-    fire.Fire(convert_images_to_video)
+    fire.Fire(create_video_from_frames)

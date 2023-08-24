@@ -100,7 +100,7 @@ if __name__ == '__main__':
         print(f"Processing frame {frame_num}/{len(dataloader)}")
         frame_id = frame_features["frame_id"][0]
 
-        _, _, _, _, _, _, _, _, flame_vertices, flame_landmarks = face_recon_model.optimize(
+        _, _, _, _, _, _, _, _, _, flame_vertices, flame_landmarks = face_recon_model.optimize(
             frame_features, first_frame=frame_num == 0)
         flame_vertices = flame_vertices.detach().cpu().numpy().squeeze().astype(np.float32)
         flame_landmarks = flame_landmarks.detach().cpu().numpy().squeeze().astype(np.float32)

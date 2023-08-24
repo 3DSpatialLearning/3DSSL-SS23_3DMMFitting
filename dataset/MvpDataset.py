@@ -220,7 +220,7 @@ class Dataset(torch.utils.data.Dataset):
 
         # set up paths
         self.imagepath = os.path.join(capturepath, "{cam}", "images", "{frame:05d}.png")
-        self.bg_image_path = os.path.join(capturepath, "{cam}", "bg", "{frame:05d}.png")
+        self.bg_image_path = os.path.join(capturepath, "{cam}", "alpha_map", "{frame:05d}.png")
         if geomdir is not None:
             self.vertpath = os.path.join(geomdir, "{frame:05d}.bin")
             self.transfpath = os.path.join(geomdir, "{frame:05d}_transform.txt")
@@ -409,6 +409,11 @@ class Dataset(torch.utils.data.Dataset):
                 background = utils.downsample(bg_img,
                                   self.downsample).transpose((2, 0, 1)).astype(np.float32)
                 background /= 255.
+                # resize background image to match target image
+                background = background.transpose((1, 2, 0))
+                background = cv2.resize(background, dsize=(image.shape[2], image.shape[1]))
+                background = background.transpose((2, 0, 1))
+
                 image = image * background  # alpha matting
                 height, width = image.shape[1:3]
                 valid = np.float32(1.0) if np.sum(image) != 0 else np.float32(0.)

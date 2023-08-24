@@ -7,9 +7,9 @@ import dataset.MvpDataset as datamodel
 outpath = "../output"
 
 ################ input path
-capturepath = "../data/subject_0/"
-objpath = "../data/subject_0_tracked_mesh/flame.obj"
-geomdir = os.path.join("../data/subject_0_tracked_mesh")
+capturepath = "../data/subject_24/"
+objpath = "../data/subject_24_tracked_mesh/flame.obj"
+geomdir = os.path.join("../data/subject_24_tracked_mesh")
 bgpath = None
 baseposepath = os.path.join(geomdir, "00000_transform.txt")
 
@@ -164,7 +164,7 @@ def get_autoencoder(dataset, renderoptions):
 class Train():
     """Profile for training models."""
     batchsize=batchsize
-    def __init__(self, maxiter=2000000, **kwargs):
+    def __init__(self, maxiter=20000, **kwargs):
         self.maxiter = maxiter
         self.otherargs = kwargs
     def get_autoencoder(self, dataset):
